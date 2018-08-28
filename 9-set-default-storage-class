@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+kubectl delete storageclass default
+kubectl delete storageclass gp2
+kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+kubectl get storageclass

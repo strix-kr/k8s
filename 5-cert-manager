@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+helm install --name cert-manager --namespace default stable/cert-manager --set ingressShim.defaultIssuerName=letsencrypt,ingressShim.defaultIssuerKind=ClusterIssuer,ingressShim.defaultACMEChallengeType=dns01,ingressShim.defaultACMEDNS01ChallengeProvider=route53
+
