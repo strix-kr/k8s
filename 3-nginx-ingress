@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+helm install --name nginx-ingress --namespace default stable/nginx-ingress
+
+

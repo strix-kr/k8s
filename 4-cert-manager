@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+helm install --name cert-manager --namespace default stable/cert-manager
+
+
