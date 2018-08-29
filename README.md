@@ -74,5 +74,12 @@ if the changes require instances to restart,
 kops rolling-update cluster --yes
 ```
 
+### To upgrade k8s
+```
+kops upgrade cluster --yes
+kops update cluster --yes
+kops rolling-update cluster --yes
+```
+
 ### See more
 See https://github.com/kubernetes/kops/blob/master/docs/cli/kops.md

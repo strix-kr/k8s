@@ -5,7 +5,7 @@ metadata:
   name: manager-bind-cluster-admin
 subjects:
 - kind: Group
-  name: manager
+  name: system:manager
   apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
@@ -20,7 +20,7 @@ metadata:
   namespace: dev
 subjects:
 - kind: Group
-  name: developer
+  name: system:developer
   apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
@@ -35,7 +35,7 @@ metadata:
   namespace: prod
 subjects:
 - kind: Group
-  name: developer
+  name: system:developer
   apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
@@ -49,7 +49,7 @@ metadata:
   namespace: default
 subjects:
 - kind: Group
-  name: developer
+  name: system:developer
   apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
@@ -77,7 +77,7 @@ metadata:
   name: developer-bind-cluster-view
 subjects:
 - kind: Group
-  name: developer
+  name: system:developer
   apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
