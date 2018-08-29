@@ -1,5 +1,4 @@
 kubectl config set-credentials "k8s.strix.kr-ldap-auth" \
-  --name k8s-strix-kr
   --auth-provider oidc \
   --auth-provider-arg idp-issuer-url=https://iam.strix.kr/auth/realms/default \
   --auth-provider-arg client-id=kubernetes \
