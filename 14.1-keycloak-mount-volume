@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+kubectl patch sts -n default keycloak --type json -p "$(cat << EOF
+[
+  {
+		"op" : "replace" ,
+		"path" : "/spec/template/spec/volumes/1" ,
+		"value" : {
+      "name": "themes",
+      "persistentVolumeReclaimPolicy": "Reatin",
+      "persistentVolumeClaim": {
+        "claimName": "keycloak-themes"
+      }
+    }
+	},
+  {
+		"op" : "replace" ,
+		"path" : "/spec/template/spec/containers/0/volumeMounts/1" ,
+    "value": {
+      "name": "themes",
+      "mountPath": "/opt/jboss/keycloak/themes"
+    }
+  }
+]
+EOF
+)"
