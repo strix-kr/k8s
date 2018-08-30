@@ -5,15 +5,14 @@ metadata:
   namespace: dev
 spec:
   podSelector: {}
-  policyTypes: [ Ingress, Egress ]
-  egress: []
+  policyTypes: [ Ingress ]
   ingress:
     - from:
       - namespaceSelector:
           matchExpressions:
             - key: environment
-              operator: Exists 
-              values: []
+              operator: NotIn
+              values: [ prod ]
 ---
 apiVersion: extensions/v1beta1
 kind: NetworkPolicy
@@ -22,13 +21,12 @@ metadata:
   namespace: prod
 spec:
   podSelector: {}
-  policyTypes: [ Ingress, Egress ]
-  egress: []
+  policyTypes: [ Ingress ]
   ingress:
     - from:
       - namespaceSelector:
           matchExpressions:
             - key: environment
-              operator: Exists
-              values: []
+              operator: NotIn
+              values: [ dev ]
 ---
