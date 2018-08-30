@@ -81,5 +81,11 @@ kops update cluster --yes
 kops rolling-update cluster --yes
 ```
 
+### for disaster on rolling update
+kops validate cluster
+kubectl describe nodes
+see aws console ec2 status
+ssh into node and master node
+
 ### See more
 See https://github.com/kubernetes/kops/blob/master/docs/cli/kops.md

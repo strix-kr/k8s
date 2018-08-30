@@ -3,40 +3,54 @@ kind: Namespace
 metadata:
   name: dev
   labels:
-    name: dev
+    environment: dev
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: prod
   labels:
-    name: prod
+    environment: prod
 ---
-kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
+  name: deny-ingress-from
   namespace: dev
-  name: deny-ingress-from-prod
 spec:
-  podSelector:
-    matchLabels:
   ingress:
   - from:
     - namespaceSelector:
         matchExpressions:
-          - {key: name, operator: NotIn, values: [prod]}
+        - key: environment
+          operator: NotIn
+          values:
+          - prod
+  egress:
+  - to:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
 ---
-kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
+  name: deny-ingress-from
   namespace: prod
-  name: deny-ingress-from-dev
 spec:
-  podSelector:
-    matchLabels:
   ingress:
   - from:
     - namespaceSelector:
         matchExpressions:
-          - {key: name, operator: NotIn, values: [dev]}
+        - key: environment
+          operator: NotIn
+          values:
+          - dev
+  egress:
+  - to:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
 ---
