@@ -68,12 +68,4 @@ kubectl config get-contexts/use-context
 ```
 ...
 
-
-stuck in trouble
-https://console.aws.amazon.com/route53/home?region=ap-northeast-2#resource-record-sets:ZSOAG5RQYWIDL
-https://ap-northeast-2.console.aws.amazon.com/ec2/v2/home?region=ap-northeast-2#Instances:sort=desc:launchTime
-https://github.com/strix-kr/k8s
-https://github.com/rmmh/k8s-kops/blob/master/docs/networking.md
-https://github.com/projectcalico/cni-plugin/issues/434
-
 kops rolling-update cluster --force --yes   --fail-on-validate-error="false"   --node-interval 1m --master-interval 1m

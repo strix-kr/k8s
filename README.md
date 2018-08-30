@@ -83,7 +83,9 @@ kops rolling-update cluster --yes
 
 ### for disaster on rolling update
 kops validate cluster
+when stuck .. draining pod: see describe nodes .. unterminated pod, and delete.
 kubectl describe nodes
+kubectl cluster-info dump
 see aws console ec2 status
 ssh into node and master node
 
