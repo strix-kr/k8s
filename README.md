@@ -119,7 +119,7 @@ kubectl exec busybox-57c9c54c8-lmf7j -n prod -- wget busybox.default
 or.. let all pot od busybox.prod wget busybox.default
 export WGET_FROM=prod
 export WGET_TO=default
-kubectl get pods -n $WGET_FROM -l app=busybox -o wide | awk -v FROM="$WGET_FROM" -v TO="$WGET_TO" '{ if (NR>1) print "echo \x27 * " FROM, ",", $1, "," $7 ")", "->", FROM "\x27;", "kubectl exec -n" FROM, $1, "-- wget -O- busybox." TO }' | basha
+kubectl get pods -n $WGET_FROM -l app=busybox -o wide | awk -v FROM="$WGET_FROM" -v TO="$WGET_TO" '{ if (NR>1) print "echo \x27 * " FROM, ",", $1, "," $7 ")", "->", FROM "\x27;", "kubectl exec -n" FROM, $1, "-- wget -O- busybox." TO }' | bash
 
 ### restart whole k8s process
 enter master node via ssh and as root
@@ -131,6 +131,14 @@ iptables -tnat --flush
 systemctl start kubelet
 systemctl start docker
 ```
+
+### kill stucked pod
+kubectl delete pod -l k8s-app=kube-dns -n kube-system --grace-period=0 --force
+
+### immediately evict all pods node
+// kill all pods from specific node immediately
+export NODENAME="abcdefg"
+kubectl get pods --all-namespaces -o wide | grep $NODE_NAME | awk '{print "kubectl delete pod", $2, "-n", $1, "--force --grace-period=0"}' | bash
 
 ### Installed  CNI plugin
 calico via kops: https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/
