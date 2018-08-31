@@ -3,12 +3,12 @@ kind: Namespace
 metadata:
   name: dev
   labels:
-    environment: dev
+    env: dev
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: prod
   labels:
-    environment: prod
+    env: prod
 ---

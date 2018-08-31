@@ -1,7 +1,7 @@
 apiVersion: extensions/v1beta1
 kind: NetworkPolicy
 metadata:
-  name: deny-ingress-from
+  name: block-ingress-from
   namespace: dev
 spec:
   podSelector: {}
@@ -10,23 +10,23 @@ spec:
     - from:
       - namespaceSelector:
           matchExpressions:
-            - key: environment
+            - key: env
               operator: NotIn
               values: [ prod ]
 ---
 apiVersion: extensions/v1beta1
 kind: NetworkPolicy
 metadata:
-  name: deny-ingress-from
+  name: block-ingress-from
   namespace: prod
 spec:
   podSelector: {}
   policyTypes: [ Ingress ]
   ingress:
     - from:
-      - namespaceSelector:
-          matchExpressions:
-            - key: environment
-              operator: NotIn
-              values: [ dev ]
+        - namespaceSelector:
+            matchExpressions:
+              - key: env
+                operator: NotIn
+                values: [ dev ]
 ---
