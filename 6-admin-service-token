@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+kubectl create serviceaccount admin -n default
+kubectl create clusterrolebinding admin --clusterrole=cluster-admin --serviceaccount=default:admin
+kubectl get secret $(kubectl get sa admin -o jsonpath='{.secrets[].name}') -o jsonpath='{.data.token}' | base64 --decode; echo

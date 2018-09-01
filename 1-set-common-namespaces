@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+kubectl label namespace default env=common
+kubectl label namespace kube-system default env=common
+kubectl label namespace kube-public default env=common

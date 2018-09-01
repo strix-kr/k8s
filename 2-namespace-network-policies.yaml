@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: namespace-ingress
+  namespace: dev
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            env: dev
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            env: common
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: namespace-ingress
+  namespace: prod
+spec:
+  podSelector: {}
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            env: prod
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            env: common
+---

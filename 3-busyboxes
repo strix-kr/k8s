@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+kubectl run --expose=true --port=8000 --image=crccheck/hello-world --labels='app=busybox' --namespace default busybox
+kubectl run --expose=true --port=8000 --image=crccheck/hello-world --labels='app=busybox' --namespace dev busybox
+kubectl run --expose=true --port=8000 --image=crccheck/hello-world --labels='app=busybox' --namespace prod busybox
+
+kubectl patch svc busybox -n default --type json -p '[{"op": "replace", "path": "/spec/ports/0", "value": {"protocol": "TCP", "port": 80, "targetPort": 8000}}]'
+kubectl patch svc busybox -n dev --type json -p '[{"op": "replace", "path": "/spec/ports/0", "value": {"protocol": "TCP", "port": 80, "targetPort": 8000}}]'
+kubectl patch svc busybox -n prod --type json -p '[{"op": "replace", "path": "/spec/ports/0", "value": {"protocol": "TCP", "port": 80, "targetPort": 8000}}]'
+
+kubectl scale --replicas=3 deploy -l app=busybox -n dev
+kubectl scale --replicas=3 deploy -l app=busybox -n prod
+kubectl scale --replicas=3 deploy -l app=busybox -n default
+
+# kubectl get pods -l app=busybox --all-namespaces

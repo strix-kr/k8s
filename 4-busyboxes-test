@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+# usage: ./command from-namespace to-namespace
+FROM=$1
+TO=$2
+echo " * Send HTTP request [$FROM -> $TO]"
+kubectl get pods -n $FROM -l app=busybox -o wide \
+  | awk -v FROM="$FROM" -v TO="$TO" \
+  'NR>1 { print "echo \x27 *", $7 "/" FROM "/" $1, "->", "busybox." TO "\x27;", "kubectl exec -n", FROM, $1, "-- wget -O- busybox." TO }' \
+  | bash
+echo

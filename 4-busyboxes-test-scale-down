@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+kubectl scale --replicas=1 deploy busybox -n dev
+kubectl scale --replicas=1 deploy busybox -n prod
+kubectl scale --replicas=1 deploy busybox -n default
+kubectl get pods --all-namespaces -lapp=busybox
