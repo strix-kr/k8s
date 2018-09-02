@@ -1,0 +1,132 @@
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: kube-backup-reader
+rules:
+- apiGroups: ["*"]
+  resources: [
+    "configmaps",
+    "cronjobs",
+    "deployments",
+    "daemonsets",
+    "ingresses",
+    "namespaces",
+    "networkpolicies",
+    "replicationcontrollers",
+    "services",
+    "secrets",
+    "statefulsets",
+    "storageclasses",
+    "customresourcedefinitions"
+  ]
+  verbs: ["get", "list"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: kube-backup
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: kube-backup
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: kube-backup-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-backup
+  namespace: kube-system
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: kube-state-backup
+  namespace: kube-system
+  labels:
+    app: kube-backup
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: kube-backup
+          name: kube-backup
+        spec:
+          containers:
+          - image: ptlange/kube-backup:1.9.3-2
+            imagePullPolicy: Always
+            name: backup
+            resources: {}
+            env:
+            - name: RESOURCETYPES
+              value: "ingress deployment configmap secret svc rc ds thirdpartyresource networkpolicy statefulset storageclass cronjob"
+            - name: GIT_REPO
+              value: "git@github.com:strix-kr/k8s-backup.git"
+            - name: GIT_USERNAME
+              value: "kube-backup"
+            - name: GIT_EMAIL
+              value: "kube-backup@k8s.strix.kr"
+            - name: GITCRYPT_ENABLE
+              value: "true"
+            - name: GITCRYPT_SYMMETRIC_KEY
+              value: "/secrets/symmetric.key"
+            volumeMounts:
+            - name: gitcryptkey
+              mountPath: /secrets
+            - name: sshkey
+              mountPath: /backup/.ssh
+            - name: cache
+              mountPath: /backup/
+          dnsPolicy: ClusterFirst
+          terminationGracePeriodSeconds: 30
+          serviceAccountName: kube-backup
+          volumes:
+          - name: gitcryptkey
+            secret:
+              defaultMode: 420
+              secretName: kube-backup-gitcryptkey
+          - name: sshkey
+            secret:
+              defaultMode: 420
+              secretName: kube-backup-sshkey
+          - name: cache
+            emptyDir: {}
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: kube-state-backup-cleaner
+  namespace: kube-system
+  labels:
+    app: kube-backup-cleaner
+spec:
+  schedule: "1 6 * * *"
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          name: job-cleanup
+          labels:
+            app: kube-backup-cleaner
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: kubectl
+            image: quay.io/coreos/hyperkube:v1.5.4_coreos.0
+            command: [ '/bin/bash', '-c', '/hyperkube kubectl get jobs -l app=kube-backup -o name --sort-by=metadata.creationTimestamp | head -n -2 | xargs /hyperkube kubectl delete; exit 0' ]
+            resources:
+              requests:
+                cpu: 0.1
+                memory: 256Mi
+---

@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: dokuwiki
+  namespace: default
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+  - secretName: wiki-strix-kr
+    hosts:
+    - wiki.strix.kr
+  rules:
+  - host: wiki.strix.kr
+    http:
+      paths:
+      - backend:
+          serviceName: dokuwiki-dokuwiki
+          servicePort: 80
+        path: /
+---
