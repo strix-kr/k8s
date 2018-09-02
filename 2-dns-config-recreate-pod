@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-kubectl delete pod -n kube-system -l k8s-app=kube-dns

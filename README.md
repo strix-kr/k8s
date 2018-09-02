@@ -110,14 +110,12 @@ kubectl patch deployment/kube-dns-autoscaler -n kube-system --type='json' -p '[
 ```
 
 coredns는 kube-dns에 비해 DNS 서비스를 구성 할 수 있는 다양한 기능을 제공하며, 그 구성을 k8s API로 [손쉽게 편집](https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/#coredns-configmap-options) 할 수 있습니다.
-  - [로컬 존 파일 적용 (/etc/hosts)](https://coredns.io/plugins/hosts/):
   - [DNS 포워딩](https://coredns.io/plugins/proxy/):
     타 네임서버로 쿼리 요청을 위임할 수 있습니다.
   - [DNS 페더레이션](https://coredns.io/plugins/federation/):
     클러스터 레벨의 결합이 필요한 경우 클러스터간의 서비스 탐지를 결합 할 수 있습니다.
+  - [로컬 존 파일 적용 (/etc/hosts)](https://coredns.io/plugins/hosts/):
   - [기타 플러그인들](https://coredns.io/plugins/)
-
-이제 클러스터 안에서 cname.out은 google.com으로 연결됩니다.
 
 ### C. 네트워크 정책
 [kube-router](https://github.com/cloudnativelabs/kube-router)는 k8s 클러스터에 CNI 레이어를 담당하는 애드온으로 설치되었습니다. 현 시점에서 k8s 클러스터의 기본 구성은 k8s network policy API의 스펙을 실제로 구현하지 않고 있습니다. 이 때문에 클러스터에 namespace/pod/ip/port 등의 리소스를 기준으로 inbound/outbound 방화벽 정책을 설정하려면 이 같은 별도의 애드온이 필요합니다. [ref.](https://github.com/kubernetes/kops/blob/master/docs/networking.md)
