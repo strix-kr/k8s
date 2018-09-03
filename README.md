@@ -271,10 +271,10 @@ kubectl -n kube-system exec -it ${KR_POD} bash
 k8s가 위치한 EC2 인스턴스의 VPC(k8s.strix.kr VPC)와 RDS 인스턴스의 VPC(db.k8s.strix.kr VPC)를 [피어링](https://docs.aws.amazon.com/ko_kr/AmazonVPC/latest/PeeringGuide/vpc-peering-basics.html)합니다.
 
 - RDS 인스턴스에 할당된 도메인을 소유한 DNS 존에 CNAME 레코드로 연결하고 이후 k8s의 내부 서비스에서는 생성한 레코드의 도메인으로 접근합니다.
-  - public IP로의 접근을 허용하려면 RDS 인스턴스의 public 접근을 허용하고, 제한된 public CIDR/IP 내에서 inbound를 허용하는 보안 그룹(현 시점에서 **public-db.k8s.strix.kr**로 구성)을 추가로 적용합니다.
-  - k8s VPC 내에서 private IP로의 접근을 허용하려면 private inbound를 허용하는 보안 그룹(현 시점에서 **peering-db.k8s.strix.kr**로 구성)을 추가로 적용합니다.
-    - VPC간 피어링이 올바르게 구축되지 않았거나 도메인이 public IP로 해석되는 경우엔 트래픽이 인터넷을 경유하게 됩니다.
-    - RDS가 할당한 도메인은 자동적으로 VPC 내부에서는 private IP로 외부에서는 public IP로 해석됩니다.
+- public IP로의 접근을 허용하려면 RDS 인스턴스의 public 접근을 허용하고, 제한된 public CIDR/IP 내에서 inbound를 허용하는 보안 그룹(현 시점에서 **public-db.k8s.strix.kr**로 구성)을 추가로 적용합니다.
+- k8s VPC 내에서 private IP로의 접근을 허용하려면 private inbound를 허용하는 보안 그룹(현 시점에서 **peering-db.k8s.strix.kr**로 구성)을 추가로 적용합니다.
+  - VPC간 피어링이 올바르게 구축되지 않았거나 도메인이 public IP로 해석되는 경우엔 트래픽이 인터넷을 경유하게 됩니다.
+  - RDS가 할당한 도메인은 자동적으로 VPC 내부에서는 private IP로 외부에서는 public IP로 해석됩니다.
 
 이렇게 RDS가 할당한 도메인을 다시 한번 소유한 DNS 존의 CNAME 레코드로 연결하면 (ex. my.db.k8s.strix.kr -> blabla-blabla.blabla.ap-northeast-2.rds.amazonaws.com), 추후 RDS 엔드포인트의 변경에 빠르게 대응 할 수 있습니다.
 
@@ -316,9 +316,9 @@ kubectl port-forward --namespace kubeapps svc/kubeapps 8080:80
   Ingress 리소스의 업데이트를 해석하여 로드밸런서에 연결합니다. 이를 통해 내부 Service를 Ingress와 연결하여 인터넷 게이트웨이에 연결 할 수 있습니다.
     - 사용하려는 주 도메인에 로드밸런서를 연결하고, 와일드카드 서브 도메인(*)에 주 도메인을 CNAME으로 연결합니다. AWS Route53에 호스팅하는 다른 도메인도 같은 방식으로 리버스 프록시를 자동화 할 수 있습니다.
     - kubeapps-dashboard 서비스를 연결하는 Ingress를 생성합니다. 이때 tls-acme annotation을 통해 TLS 인증서 발급을 자동화합니다. (ref. **8-kubeapps-ingress.yaml**)
-      - `kubectl logs -l app=nginx-ingress -n default`로 nginx 구성의 업데이트 진행을 확인 할 수 있습니다. 수 초내로 완료됩니다.
-      - `kubectl logs -l app=cert-manager -n default`로 인증서 발급 진행을 확인 할 수 있습니다. 수 분내로 완료됩니다.
-      - 이제 https://apps.k8s.strix.kr 로 접속 할 수 있습니다.
+    - `kubectl logs -l app=nginx-ingress -n default`로 nginx 구성의 업데이트 진행을 확인 할 수 있습니다. 수 초내로 완료됩니다.
+    - `kubectl logs -l app=cert-manager -n default`로 인증서 발급 진행을 확인 할 수 있습니다. 수 분내로 완료됩니다.
+    - 이제 https://apps.k8s.strix.kr 로 접속 할 수 있습니다.
 
 - [kube-system/kube-dashboard](https://github.com/kubernetes/dashboard):
   대시보드는 k8s 클러스터에 등록된 모든 리소스에 대한 명세를 확인하고 수정 할 수 있는 웹 UI를 제공합니다. 또한 클러스터 node 및 각 pod들이 소비하는 CPU/RAM에 대한 메트릭을 제공합니다. 또한 웹 상에서 각 pod에서 수집된 로그를 확인하고 shell을 구동 할 수 있습니다. (ref. **9-kube-dashboard-ingress.yaml**)
