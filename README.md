@@ -328,10 +328,6 @@ kubectl port-forward --namespace kubeapps svc/kubeapps 8080:80
     - Secret 리소스는 [git-crypt](https://github.com/AGWA/git-crypt)로 대칭키 암호화되어 커밋됩니다.
     - helm 차트가 제공되지 않으므로 수동으로 설치되었습니다.
 
-- [kube-system/kube-db](https://kubedb.com):
-  데이터베이스를 써드파티 리소스로 정의하여 k8s 클러스터 내에 손쉽게 생성 할 수 있습니다. 자동화된 백업, 복원 기능 및 **kubedb**라는 전용 CLI를 제공합니다.
-    - kubedb의 인터페이스는 kubectl과 거의 동일하며 kubectl로도 kubedb가 제공하는 리소스를 모두 조작 할 수 있습니다. 다만 kubedb는 데이터베이스에 한정된 리소스만을 조작하며, 추가적으로 위험한 명령에 대한 검증 및 디버깅 관련 인터페이스를 제공합니다.
-
 - [default/dokuwiki](https://www.dokuwiki.org/ko:dokuwiki):
   오픈소스 위키 소프트웨어입니다. (ref. **11-dokuwiki-ingress.yaml**)
     - dokuwiki 서비스를 연결하는 Ingress를 생성합니다. 이제 https://wiki.strix.kr 로 접속 할 수 있습니다.
