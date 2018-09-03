@@ -1,7 +1,6 @@
-# k8s 인프라 관리 매뉴얼
-## 1. 인프라 구축 히스토리
-### A. AWS에 Kubernetes 배포
-#### kops
+# 인프라 구축 히스토리
+## 1. AWS에 Kubernetes 배포
+### kops
 [kops](https://github.com/kubernetes/kops)는 kubeadm를 활용한 k8s 클러스터 구성 및 관리 도구입니다. [AWS용 가이드](https://github.com/kubernetes/kops/blob/master/docs/aws.md)를 참고하여 사전 조건을 완료합니다.
 ```
 - kubectl, kops CLI 설치
@@ -59,7 +58,7 @@ kops create cluster \
 - 기본적인 클러스터 구성 변경 및 업그레이드 가이드:
   https://github.com/kubernetes/kops/blob/master/docs/cli/kops_rolling-update.md
 
-#### 문제 해결
+### 문제 해결
 1. [롤링 업데이트](https://github.com/kubernetes/kops/blob/master/docs/cli/kops_rolling-update.md) 도중 예기치 못한 이유로 노드 방출에 실패하여 클러스터가 마비되는 경우.
 ```
 kops validate cluster
@@ -84,7 +83,7 @@ kubectl proxy
 open http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/
 ```
 
-### B. DNS 서비스 제공자 설정
+## 2. DNS 서비스 제공자 설정
 클러스터 생성 후 kops를 이용해서 클러스터의 DNS 서비스 제공자를 [CoreDNS](https://coredns.io/plugins/kubernetes/)로 [변경](https://github.com/kubernetes/kops/blob/master/docs/cluster_spec.md#kubedns)하고 클러스터를 [업데이트](https://github.com/kubernetes/kops/blob/master/docs/changing_configuration.md)합니다. 이 때 롤링 업데이트는 필요하지 않습니다.
 
 클러스터 생성시 기본 DNS 서비스 제공자는 **kube-dns**로 지정되어 있습니다. 클러스터에 **coredns**가 배포된 이후 kube-dns를 제거하고 dns-auto-scaler 애드온의 배포 커맨드를 수정합니다.
@@ -134,12 +133,12 @@ kubectl delete pod -l k8s-app=kube-dns -n kube-system
 ```
 
 
-### C. 네트워크 정책 설정
+## 3. 네트워크 정책 설정
 [kube-router](https://github.com/cloudnativelabs/kube-router)는 k8s 클러스터에 CNI 레이어를 담당하는 애드온으로 설치되었습니다. 현 시점에서 k8s 클러스터의 기본 구성은 k8s network policy API의 스펙을 실제로 구현하지 않고 있습니다.
 
 이 때문에 클러스터에 namespace/pod/ip/port 등을 기준으로 inbound/outbound 방화벽 정책을 설정하려면 이 같은 [별도의 애드온](https://github.com/kubernetes/kops/blob/master/docs/networking.md)이 필요합니다.
 
-#### 네임스페이스간 방화벽
+### 네임스페이스간 방화벽
 기본 네임스페이스 **default** 외에 추가로 **prod**, **dev** 네임스페이스를 생성합니다. (ref. **1-namespaces**) 네임스페이스 레벨의 방화벽을 적용하기 위해서 각 네임스페이스에 다음과 같이 레이블링합니다. (ref. **1-set-common-namespaces**)
 - env=common:
   - default
@@ -157,7 +156,7 @@ env=prod <-> env=common <-> env=dev
 
 현 시점(18.09.01)에서 네트워크 정책 리소스 업데이트시 kube-router가 [networking.k8s.io/NetworkPolicy API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#networkpolicy-v1-networking-k8s-io) 스펙을 지원하는 점에 유의해야합니다. 또한 `namespaceSelector.matchExpressions`가 구현되지 않았기에 `namespaceSelector.matchLabels`를 이용합니다.
 
-#### 네임스페이스간 방화벽 테스트 도구
+### 4. 네임스페이스간 방화벽 테스트 도구
 prod, default, dev의 각 네임스페이스에 **busybox**라는 이름으로 service/deployment가 등록했습니다. (ref. **3-busyboxes**)
 
 배포된 pod들은 네트워크 정책 디버깅 용도로 생성되었습니다. 작성된 스크립트(**ref. 4-busyboxes-test-***)를 이용하면 손쉽게 트래픽을 점검 할 수 있습니다.
@@ -171,9 +170,9 @@ dehypnosis-mac:k8s dehypnosis$ ./4-busyboxes-test default dev
 Hello World
 
 
-                                       ##         .
-                                 ## ## ##        ==
-                              ## ## ## ## ##    ===
+                                       #         .
+                                 # # #        ==
+                              # # # # #    ===
                            /""""""""""""""""\___/ ===
                       ~~~ {~~ ~~~~ ~~~ ~~~~ ~~ ~ /  ===- ~~~
                            \______ o          _,/
@@ -192,9 +191,9 @@ Connecting to busybox.prod (100.64.217.8:80)
 Hello World
 
 
-                                       ##         .
-                                 ## ## ##        ==
-                              ## ## ## ## ##    ===
+                                       #         .
+                                 # # #        ==
+                              # # # # #    ===
                            /""""""""""""""""\___/ ===
                       ~~~ {~~ ~~~~ ~~~ ~~~~ ~~ ~ /  ===- ~~~
                            \______ o          _,/
@@ -211,9 +210,9 @@ dehypnosis-mac:k8s dehypnosis$ ./4-busyboxes-test prod default
 Hello World
 
 
-                                       ##         .
-                                 ## ## ##        ==
-                              ## ## ## ## ##    ===
+                                       #         .
+                                 # # #        ==
+                              # # # # #    ===
                            /""""""""""""""""\___/ ===
                       ~~~ {~~ ~~~~ ~~~ ~~~~ ~~ ~ /  ===- ~~~
                            \______ o          _,/
@@ -245,9 +244,9 @@ dehypnosis-mac:k8s dehypnosis$ ./4-busyboxes-test dev default
 Hello World
 
 
-                                       ##         .
-                                 ## ## ##        ==
-                              ## ## ## ## ##    ===
+                                       #         .
+                                 # # #        ==
+                              # # # # #    ===
                            /""""""""""""""""\___/ ===
                       ~~~ {~~ ~~~~ ~~~ ~~~~ ~~ ~ /  ===- ~~~
                            \______ o          _,/
@@ -265,7 +264,7 @@ KR_POD=$(basename $(kubectl -n kube-system get pods -l k8s-app=kube-router --out
 kubectl -n kube-system exec -it ${KR_POD} bash
 ```
 
-### D. AWS VPC 피어링 (외부 자원 연결)
+## 5. AWS VPC 피어링 (외부 자원 연결)
 이 작업으로 추후 각종 AWS RDS(및 각종 AWS 자원)의 사용에서 헤어핀 트래픽(U자형)으로 인한 지연 시간과 네트워크 비용을 감소시킬 수 있습니다.
 
 k8s가 위치한 EC2 인스턴스의 VPC(k8s.strix.kr VPC)와 RDS 인스턴스의 VPC(db.k8s.strix.kr VPC)를 [피어링](https://docs.aws.amazon.com/ko_kr/AmazonVPC/latest/PeeringGuide/vpc-peering-basics.html)합니다.
@@ -278,9 +277,9 @@ k8s가 위치한 EC2 인스턴스의 VPC(k8s.strix.kr VPC)와 RDS 인스턴스�
 이렇게 RDS가 할당한 도메인을 다시 한번 소유한 DNS 존의 CNAME 레코드로 연결하면 (ex. my.db.k8s.strix.kr -> blabla-blabla.blabla.ap-northeast-2.rds.amazonaws.com), 추후 RDS 엔드포인트의 변경에 빠르게 대응 할 수 있습니다.
 
 
-### E. 패키지 설치 도구
+## 6. 패키지 설치 도구
 
-#### helm 및 tiler/kubeapps 설치
+### helm 및 tiler/kubeapps 설치
 kubectl와 yaml 파일들로 소프트웨어 패키지를 관리 할 수 있지만, 복잡한 소프트웨어를 클러스터에 설치하고 관리하는 일을 더 쉽게하기 위해 [helm](https://github.com/helm/helm)  패키지 매니저를 사용합니다.
 
 로컬과 클러스터에 각각 client(helm), server(tiler)를 초기화합니다. 추후 다른 머신에서는 로컬의 helm만 초기화하게 됩니다.
@@ -290,7 +289,7 @@ helm init
 
 다음으로 tiler에게 service account를 생성해주고 클러스터에 전체에 관한 권한을 위임합니다. 또한 helm chart(패키지) 관리를 돕는 웹 서비스 [kubeapps](https://github.com/kubeapps/kubeapps)를 설치합니다. (ref. **5-install-tiler-and-kube-apps**)
 
-#### kubeapps를 프록시하여 접속
+### kubeapps를 프록시하여 접속
 지금까지 관리자가 kubectl을 통해서 k8s API 서버에 PKI로 인증을 했지만, 여러 k8s 서비스에서 관리자가 웹 브라우저에서 로그인 할 때는 토큰 방식의 인증을 이용합니다.
 여기서 생성한 service account의 토큰은 이후에 k8s 대시보드 같은 k8s API의 cluster-admin 권한이 필요한 모든 서비스에 접근 할 때도 이용 할 수 있습니다. (ref. **6-admin-service-token**)
 
@@ -305,7 +304,7 @@ kubectl port-forward --namespace kubeapps svc/kubeapps 8080:80
 ```
 당장 웹 서버가 없기에 kubectl port-forward를 통해 로컬에서 접속합니다.
 
-#### 설치된 패키지
+## 7. 설치된 패키지
 - [default/cert-manager](https://github.com/jetstack/cert-manager):
   Ingress 리소스에 관련 annotation을 추가하면 ACME 프로토콜을 통해 Let's Encrypt 등의 CA에게 인증서를 요청, 적용, 갱신하는 작업을 자동화합니다.
     - 설치시 annotation-shim 기능을 미리 활성화합니다.
