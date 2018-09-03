@@ -270,11 +270,10 @@ kubectl -n kube-system exec -it ${KR_POD} bash
 
 k8s가 위치한 EC2 인스턴스의 VPC(k8s.strix.kr VPC)와 RDS 인스턴스의 VPC(db.k8s.strix.kr VPC)를 [피어링](https://docs.aws.amazon.com/ko_kr/AmazonVPC/latest/PeeringGuide/vpc-peering-basics.html)합니다.
 
-- RDS 인스턴스에 할당된 도메인을 소유한 DNS 존에 CNAME 레코드로 연결하고 이후 k8s의 내부 서비스에서는 생성한 레코드의 도메인으로 접근합니다.
-- public IP로의 접근을 허용하려면 RDS 인스턴스의 public 접근을 허용하고, 제한된 public CIDR/IP 내에서 inbound를 허용하는 보안 그룹(현 시점에서 **public-db.k8s.strix.kr**로 구성)을 추가로 적용합니다.
-- k8s VPC 내에서 private IP로의 접근을 허용하려면 private inbound를 허용하는 보안 그룹(현 시점에서 **peering-db.k8s.strix.kr**로 구성)을 추가로 적용합니다.
-  - VPC간 피어링이 올바르게 구축되지 않았거나 도메인이 public IP로 해석되는 경우엔 트래픽이 인터넷을 경유하게 됩니다.
-  - RDS가 할당한 도메인은 자동적으로 VPC 내부에서는 private IP로 외부에서는 public IP로 해석됩니다.
+- RDS 인스턴스에 할당된 도메인을 소유한 DNS 존에 CNAME 레코드로 연결하고 이후에는 생성한 레코드의 도메인으로 접근합니다.
+- 인터넷 접근을 허용하려면 RDS 인스턴스의 인터넷 접근을 허용하고, 제한된 public CIDR/IP 내에서 inbound를 허용하는 보안 그룹(현 시점에서 **public-db.k8s.strix.kr**로 구성)을 추가로 적용합니다.
+  - 인터넷 접근이 활성화된 RDS에 할당된 도메인은 VPC 내부에서는 private IP로 외부에서는 public IP로 해석됩니다.
+- k8s VPC 내에서 private IP로의 접근을 허용하려면 private inbound를 허용하는 보안 그룹(현 시점에서 **peering-db.k8s.strix.kr**로 구성)을 적용합니다. 이를 통해 헤어핀 트래픽을 방지합니다.
 
 이렇게 RDS가 할당한 도메인을 다시 한번 소유한 DNS 존의 CNAME 레코드로 연결하면 (ex. my.db.k8s.strix.kr -> blabla-blabla.blabla.ap-northeast-2.rds.amazonaws.com), 추후 RDS 엔드포인트의 변경에 빠르게 대응 할 수 있습니다.
 
