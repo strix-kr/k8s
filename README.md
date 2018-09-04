@@ -2,12 +2,10 @@
 ## 1. AWS에 Kubernetes 배포
 ### kops
 [kops](https://github.com/kubernetes/kops)는 kubeadm를 활용한 k8s 클러스터 구성 및 관리 도구입니다. [AWS용 가이드](https://github.com/kubernetes/kops/blob/master/docs/aws.md)를 참고하여 사전 조건을 완료합니다.
-```
 - kubectl, kops CLI 설치
 - kops용 액세스키 생성 및 권한 부여 (AWS IAM)
 - 버저닝이 활성화된 kops용 클러스터 상태 저장소 생성 (AWS S3)
 - k8s API 도메인용 DNS 호스트존 구성 (AWS Route53)
-```
 
 설치 및 관리를 위해 아래 환경변수들을 로그인 셸 부팅 스크립트에 복사합니다.
 ```
@@ -21,7 +19,7 @@ export ZONES=ap-northeast-2a
 
 클러스터를 생성합니다.
 ```
-kops create cluster \
+$ kops create cluster \
   # private VPC로 클러스터를 구성하도록 합니다.
   --topology private \
   # 마스터 및 워커 노드들로의 ssh 연결을 포워딩하는 bastion 인스턴스를 생성하도록 합니다.
@@ -61,26 +59,26 @@ kops create cluster \
 ### 문제 해결
 1. [롤링 업데이트](https://github.com/kubernetes/kops/blob/master/docs/cli/kops_rolling-update.md) 도중 예기치 못한 이유로 노드 방출에 실패하여 클러스터가 마비되는 경우.
 ```
-kops validate cluster
-kubectl describe node
-kubectl cluster-info dump
-watch kubectl get deploy --all-namespaces
-watch kubectl get pod --all-namespaces
+$ kops validate cluster
+$ kubectl describe node
+$ kubectl cluster-info dump
+$ watch kubectl get deploy --all-namespaces
+$ watch kubectl get pod --all-namespaces
 ```
 위 명령어 등으로 문제점을 찾습니다. 만약 특정 pod을 제거하지못하는 경우 아래 명령어로 pod을 제거하여 수동으로 노드를 방출하도록 도울 수 있습니다.
 ```
-kubectl delete pod <셀렉터> --grace-period=0 --force
+$ kubectl delete pod <셀렉터> --grace-period=0 --force
 ```
 문제가 되는 pod이 많은 경우 아래 명령어로 다수의 노드를 제거하는 명령을 출력 할 수 있습니다.
 ```
-kubectl get pods --all-namespaces -o wide | grep <키워드> | awk '{print "kubectl delete pod", $2, "-n", $1, "--force --grace-period=0"}'
+$ kubectl get pods --all-namespaces -o wide | grep <키워드> | awk '{print "kubectl delete pod", $2, "-n", $1, "--force --grace-period=0"}'
 ```
 kubectl이나 kops가 마비되는 경우, DNS를 확인하고 수동으로 api.k8s.strix.kr 을 API 엔드포인트에 연결하세요.
 
 외부 k8s 대시보드 엔드포인트가 마비되는 경우엔 프록시를 열고 로컬에서 관리자의 service account 토큰으로 접속합니다. 이 때 토큰에 대해서는 아래에서 설명합니다.
 ```
-kubectl proxy
-open http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/
+$ kubectl proxy
+$ open http://localhost:8001/api/v1/namespaces/kube-system/services/https:kube-dashboard:/proxy/
 ```
 
 ## 2. DNS 서비스 제공자 설정
@@ -89,8 +87,8 @@ open http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernet
 클러스터 생성시 기본 DNS 서비스 제공자는 **kube-dns**로 지정되어 있습니다. 클러스터에 **coredns**가 배포된 이후 kube-dns를 제거하고 dns-auto-scaler 애드온의 배포 커맨드를 수정합니다.
 
 ```
-kubectl delete --namespace=kube-system deployment kube-dns
-kubectl patch deployment/kube-dns-autoscaler -n kube-system --type='json' -p '[
+$ kubectl delete --namespace=kube-system deployment kube-dns
+$ kubectl patch deployment/kube-dns-autoscaler -n kube-system --type='json' -p '[
   {
     "op": "replace",
     "path": "/spec/template/spec/containers/0/command",
@@ -123,13 +121,13 @@ ConfigMap의 coredns 설정을 업데이트하고 coredns의 pod들에 수동으
   - 잘못된 설정으로 DNS가 죽어버리면 설정을 업데이트하고 coredns의 pod들을 모두 재생성하면 복구 할 수 있습니다.
 
 ```
-kubectl apply -f ./0-coredns-config.yaml
+$ kubectl apply -f ./0-coredns-config.yaml
 
 # 설정을 리로드
-kubectl get pods -l k8s-app=kube-dns -n kube-system | awk 'NR>1{print "kubectl exec -n kube-system ", $1, "-- kill -SIGUSR1 1"}' | bash
+$ kubectl get pods -l k8s-app=kube-dns -n kube-system | awk 'NR>1{print "kubectl exec -n kube-system ", $1, "-- kill -SIGUSR1 1"}' | bash
 
 # 재생성
-kubectl delete pod -l k8s-app=kube-dns -n kube-system
+$ kubectl delete pod -l k8s-app=kube-dns -n kube-system
 ```
 
 
@@ -260,8 +258,8 @@ Connecting to busybox.default (100.64.158.209:80)
 더 세부적인 디버깅을 위해서 [kube-router가 제공하는 툴 박스](https://github.com/cloudnativelabs/kube-router/blob/master/docs/pod-toolbox.md#pod-toolbox)를 이용 할 수 있습니다.
 
 ```
-KR_POD=$(basename $(kubectl -n kube-system get pods -l k8s-app=kube-router --output name|head -n1))
-kubectl -n kube-system exec -it ${KR_POD} bash
+$ KR_POD=$(basename $(kubectl -n kube-system get pods -l k8s-app=kube-router --output name|head -n1))
+$ kubectl -n kube-system exec -it ${KR_POD} bash
 ```
 
 ## 5. AWS VPC 피어링 (외부 자원 연결)
@@ -284,23 +282,28 @@ kubectl와 yaml 파일들로 소프트웨어 패키지를 관리 할 수 있지�
 
 로컬과 클러스터에 각각 client(helm), server(tiler)를 초기화합니다. 추후 다른 머신에서는 로컬의 helm만 초기화하게 됩니다.
 ```
-helm init
+$ helm init
 ```
 
 다음으로 tiler에게 service account를 생성해주고 클러스터에 전체에 관한 권한을 위임합니다. 또한 helm chart(패키지) 관리를 돕는 웹 서비스 [kubeapps](https://github.com/kubeapps/kubeapps)를 설치합니다. (ref. **5-install-tiler-and-kube-apps**)
 
 ### kubeapps를 프록시하여 접속
-지금까지 관리자가 kubectl을 통해서 k8s API 서버에 PKI로 인증을 했지만, 여러 k8s 서비스에서 관리자가 웹 브라우저에서 로그인 할 때는 토큰 방식의 인증을 이용합니다.
+지금까지는 관리자가 kubectl을 통해서 k8s API를 이용 할 땐 자동으로 구성된 HTTP Basic Auth 방식의 인증을 사용했습니다. (kubectl config view로 확인)
+
+당장 kubeapps와 같은 웹 서비스에 k8s 관리자 권한을 위임 할 때는 service account 리소스를 생성하여 토큰 인증 방식을 이용합니다.
+
+차후에 통합 IAM 시스템이 구성되고 k8s API와 연동되면, service account나 HTTP Basic Auth 방식은 장애 대응 이외의 경우에는 사용하지 않습니다.
+
 여기서 생성한 service account의 토큰은 이후에 k8s 대시보드 같은 k8s API의 cluster-admin 권한이 필요한 모든 서비스에 접근 할 때도 이용 할 수 있습니다. (ref. **6-admin-service-token**)
 
 ```
-kubectl get secret $(kubectl get sa admin -o jsonpath='{.secrets[].name}') -o jsonpath='{.data.token}' | base64 --decode; echo
+$ kubectl get secret $(kubectl get sa admin -o jsonpath='{.secrets[].name}') -o jsonpath='{.data.token}' | base64 --decode; echo
 ```
 위처럼 관리자 service account 토큰을 확인 할 수 있습니다.
 
 ```
-open http://127.0.0.1:8080
-kubectl port-forward --namespace kubeapps svc/kubeapps 8080:80
+$ open http://127.0.0.1:8080
+$ kubectl port-forward --namespace kubeapps svc/kubeapps 8080:80
 ```
 당장 웹 서버가 없기에 kubectl port-forward를 통해 로컬에서 접속합니다.
 
@@ -336,35 +339,120 @@ kubectl port-forward --namespace kubeapps svc/kubeapps 8080:80
     - 본 서비스는 핵심적인 production 데이터를 관리하기에 데이터베이스 구성 및 관리를 AWS RDS에 위임합니다. AWS RDS에서 Postgres 데이터베이스를 피어링된 VPC 안에 구성하고 도메인을 할당하여, 설치시 helm 차트의 옵션에 반영해줍니다.
     - 추가로 데이터베이스 접근 패스워드를 Secret에서 읽을 수 있도록 keycloak-postgres-auth Secret을 생성하고, 설치시 helm 차트의 옵션에 반영해줍니다.
     - 추가로 UI 테마를 변경 할 수 있도록 Persistent Volume을 생성하기 위해서 별도의 PVC를 생성하고, 설치시 helm 차트의 옵션에 [반영](https://github.com/helm/charts/tree/master/stable/keycloak#providing-a-custom-theme)해줍니다.
-    - 설치 완료 후에 외부에 연결 할 수 있도록 Ingress를 생성해줍니다. 이제 https://iam.strix.kr 로 접속 할 수 있습니다.
+    - 설치 완료 후에 외부에 연결 할 수 있도록 Ingress를 생성해줍니다. 이제 https://iam.k8s.strix.kr 로 접속 할 수 있습니다.
 
 ## 8. 통합 IAM 적용
 
-### 영역 및 역할 생성
-keycloak 서비스에 접속하여 목적에 맞게 영역(realm)과 역할(role)을 생성합니다.
+### realm 및 role 생성
+keycloak 서비스에 접속하여 목적에 맞게 realm과 role을 생성합니다.
 - **master** realm
-  - 기본으로 생성되어 있는 영역이며 k8s API, k8s dashboard, kubeapps 등 사내 서비스들에 대한 인증과 접근 제어를 담당합니다. 현시점에서 아래와 같은 역할을 갖습니다.
+  - 기본으로 생성되어 있는 realm이며 k8s API, k8s dashboard, kubeapps 등 사내 서비스들에 대한 인증과 접근 제어를 담당합니다. 현시점에서 아래와 같은 역할을 갖습니다.
     - **admin** role (기본): IAM 전체 시스템에 대한 관리 권한을 갖습니다.
-    - **operator** role: prod/dev 영역에 대한 관리 권한을 갖습니다.
-    - **developer** role: dev 영역에 대한 관리 권한을 갖습니다.
-    - **manager** role: prod/dev 영역의 모든 리소스를 조회하고 유저를 관리 할 수 있습니다.
+    - **operator** role: prod/dev realm에 대한 관리 권한을 갖습니다.
+    - **developer** role: dev realm에 대한 관리 권한을 갖습니다.
+    - **manager** role: prod/dev realm의 모든 리소스를 조회하고 유저를 관리 할 수 있습니다.
   - 역할 관리의 편의를 위해 동일 한 이름의 그룹(group)을 생성하고 위에서 생성한 역할을 그룹에 맵핑합니다.
   - 관리자 콘솔의 보안을 향상시키기 위해서 추후 OTP 인증 등을 활성화 할 수 있습니다.
 - **prod 및 dev** realm
   - 추후 배포 환경별로 엔드유저들의 인증과 접근 제어를 담당합니다. 현시점에서는 아무 역할도 등록되지 않았습니다.
   - 보안을 위해 기본으로 제공되는 클라이언트(keycloak 관리자 콘솔 등)를 모두 비활성화 합니다.
   
-### k8s API 및 대시보드
+### k8s API 연동
 통합 IAM의 인증 서비스를 k8s API 및 대시보드와 연동합니다.
 
 #### k8s RBAC 구성
-k8s의 RBAC 시스템은 기본적으로 활성화되어 있습니다. 리소스 제어 권한을 분리하여 관리하기 위해서 아래의 그룹(k8s Group)에 역할(k8s ClusterRole)을 바인딩합니다.
+[k8s의 RBAC 시스템](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)은 기본적으로 활성화되어 있습니다. 유저별로 리소스 제어 권한을 분리하여 관리하기 위해서 아래의 그룹(k8s Group)에 역할(k8s ClusterRole)을 바인딩합니다.
 
 이 때 직관적인 이해를 위해서 keycloak의 역할과 동일한 이름의 그룹에 역할을 바인딩합니다. 그룹(k8s Group) 자체는 명시적으로 생성하는 리소스가 아니므로 롤 바인딩(k8s ClusterRoleBinding 및 RoleBinding) 리소스만 생성하면 됩니다..
 
 - **operator** group:
   - k8s 클러스터 리소스의 모든 관리 역할(cluster-admin ClusterRole)을 바인딩합니다.
 - **developer** group:
-  - k8s dev 네임스페이스 리소스의 모든 관리 역할(admin ClusterRole)을 바인딩합니다.
+  - dev 네임스페이스 리소스의 모든 관리 역할(admin ClusterRole)을 바인딩합니다.
   - prod 및 default 네임스페이스의 열람 역할(view ClusterRole)을 바인딩합니다.
-  - k8s 특정 클러스터 리소스(namespaces, nodes, persistent volumes, roles, storage classses)의 열람 역할(cluster-view ClusterRole)을 바인딩합니다.
+  - 특정 클러스터 리소스(namespaces, nodes, persistent volumes, roles, storage classses)의 열람 역할(cluster-view ClusterRole)을 바인딩합니다.
+
+#### k8s API를 통합 IAM에 연동
+지금까지 k8s API의 인증에 admin service account의 액세스 토큰, 또는 admin 계정의 HTTP Basic Auth 방식을 사용했습니다.
+
+k8s API의 인증과 RBAC을 통합 IAM에 연동합니다.
+
+먼저 keycloak master realm에 **kubernetes** 클라이언트를 등록합니다.
+  - Standard Flow 인증(OpenID Connect)을 활성화합니다.
+  - AcceccType을 Confidential로 두어 클라이언트 secret키를 생성합니다.
+  - Valid Redirect URLs에 http://localhost:8000/ 을 추가합니다. 이는 추후 로컬에서 kubectl 인증 설정을 업데이트 하는데 사용될 URL입니다.
+  - 클라이언트 role을 생성하고 각각 기존의 realm role에 연결시킵니다.
+    - **operator** role: k8s의 operator 그룹으로 맵핑될 역할입니다.
+    - **developer** role: k8s의 developer 그룹으로 맵핑될 역할입니다.
+  - 클라이언트 role들을 토큰의 **groups** 클레임에 포함하는 맵퍼를 추가 합니다.
+    - 참고) 클레임 크기를 줄이기 위해서 Full Scope Access를 비활성화하면 맵퍼가 동작하지 않는 [버그](https://issues.jboss.org/browse/KEYCLOAK-5259)가 있습니다.
+
+다음으로 [k8s 클러스터에 OIDC 인증](https://kubernetes.io/docs/reference/access-authn-authz/authentication/)을 활성화합니다. kops를 이용해 클러스터 스펙에 OIDC 인증을 추가하고, 업데이트 후 마스터 노드의 롤링 업데이트가 필요합니다.
+```
+$ kops edit cluster
+```
+```
+spec:
+  kubeAPIServer:
+    oidcClientID: kubernetes
+    oidcGroupsClaim: groups
+    oidcIssuerURL: https://iam.k8s.strix.kr/realms/master
+```
+
+```
+$ kops update cluster --yes
+$ kops rolling-update cluster --yes
+```
+
+
+#### kubectl 설정
+롤링 업데이트가 끝나면 이제 OIDC 인증이 활성화되었습니다. kubect config에 OIDC 인증 설정을 추가 구성합니다. 
+
+```
+$ kubectl config set-credentials k8s.strix.kr-oidc \
+  --auth-provider oidc \
+  --auth-provider-arg idp-issuer-url=https://iam.k8s.strix.kr/realms/master \
+  --auth-provider-arg client-id=kubernetes \
+  --auth-provider-arg client-secret=<keycloak에서 발급된 클라이언트 시크릿>
+
+$ kubectl config set-context k8s.strix.kr-oidc \
+  --namespace dev \
+  --cluster=k8s.strix.kr --user=k8s.strix.kr-oidc
+```
+
+이제 기존 관리자 인증과 새로운 OIDC 인증을 모두 이용 할 수 있습니다. OIDC 인증으로 설정을 전환합니다.
+```
+$ kubectl config use-context k8s.strix.kr-oidc
+Switched to context "k8s.strix.kr-oidc".
+
+$ kubectl get pods
+Unable to connect to the server: No valid id-token, and cannot refresh without refresh-token
+```
+
+인증은 적절히 구성되었습니다. 하지만 아직 액세스 토큰이 발급되지 않았습니다. ID 토큰 및 refresh 토큰을 받급 받아 설정 파일에 반영해주는 도우미 프로그램 [kubelogin](https://github.com/int128/kubelogin/releases)을 설치합니다.
+```
+$ wget https://github.com/int128/kubelogin/releases/download/1.5/kubelogin_darwin_amd64
+$ mv kubelogin_darwin_amd64 /usr/local/bin/kubelogin
+```
+
+이제 모든 준비가 완료되었습니다.
+```
+$ kubelogin
+2018/09/04 18:34:28 Reading /Users/daniel/.kube/config
+2018/09/04 18:34:28 Using current context: k8s.strix.kr-oidc
+2018/09/04 18:34:29 Open http://localhost:8000 for authorization
+2018/09/04 18:34:29 GET /
+...
+2018/09/04 18:35:24 Got token for subject=10adf869-a37a-44b2-9589-e1a72afc4ae0
+2018/09/04 18:35:24 Updated /Users/daniel/.kube/config
+
+$ kubectl get pods
+NAME                      READY     STATUS    RESTARTS   AGE
+busybox-57c9c54c8-j9gsc   1/1       Running   0          3d
+```
+
+추후에 refresh 토큰이 만료하기 전까지는 다시 인증 할 필요가 없습니다.
+
+#### kube-dashboard 설정
+k8s 대시보드에도 활성화된 OIDC 인증과 RBAC을 적용합니다.
+
