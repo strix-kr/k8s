@@ -155,7 +155,7 @@ env=prod <-> env=common <-> env=dev
 현 시점(18.09.01)에서 네트워크 정책 리소스 업데이트시 kube-router가 [networking.k8s.io/NetworkPolicy API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#networkpolicy-v1-networking-k8s-io) 스펙을 지원하는 점에 유의해야합니다. 또한 `namespaceSelector.matchExpressions`가 구현되지 않았기에 `namespaceSelector.matchLabels`를 이용합니다.
 
 ### 4. 네임스페이스간 방화벽 테스트 도구
-prod, default, dev의 각 네임스페이스에 **busybox**라는 이름으로 service/deployment가 등록했습니다. (ref. **3-busyboxes**)
+prod, default, dev의 각 네임스페이스에 **busybox**라는 이름으로 service/deployment를 등록했습니다. (ref. **3-busyboxes**)
 
 배포된 pod들은 네트워크 정책 디버깅 용도로 생성되었습니다. 작성된 스크립트(**ref. 4-busyboxes-test-***)를 이용하면 손쉽게 트래픽을 점검 할 수 있습니다.
 
