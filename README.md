@@ -88,7 +88,7 @@ $ open http://localhost:8001/api/v1/namespaces/kube-system/services/https:kube-d
 
 ```
 $ kubectl delete --namespace=kube-system deployment kube-dns
-$ kubectl patch deployment/kube-dns-autoscaler -n kube-system --type='json' -p '[
+$ kubectl patch deployment/kube-dns-autoscaler -n kube-system --type json -p '[
   {
     "op": "replace",
     "path": "/spec/template/spec/containers/0/command",
@@ -453,6 +453,19 @@ busybox-57c9c54c8-j9gsc   1/1       Running   0          3d
 
 추후에 refresh 토큰이 만료하기 전까지는 다시 인증 할 필요가 없습니다.
 
-#### kube-dashboard 설정
-k8s 대시보드에도 활성화된 OIDC 인증과 RBAC을 적용합니다.
+#### kube-dashboard keycloak 프록시
+kube-dashboard 접속시 HTTP Authentication 헤더를 확인하고 토큰이 없을 시 keycloak으로 인증을 요청하고 토큰을 발급하여 HTTP 헤더에 담아 프록시하면 keycloak의 로그인 계정으로 kube-dashboard의 인증을 대신 할 수 있습니다.
 
+먼저 기존 kube-dashboard ingress를 삭제합니다.
+```
+kubectl delete ingress -n kube-system kube-dashboard
+```
+
+그리고 nginx-ingress controller의 프록시 버퍼 사이즈를 키워줍니다. 기본 설정으로는 OIDC의 클레임을 모두 프록시하지 못해서 정상적으로 작동하지 못합니다.
+```
+kubectl patch configmap -n default nginx-ingress-controller -p '{"data": {"proxy-buffer-size": "64k"}}'
+```
+
+[프록시 서비스](https://github.com/gambol99/keycloak-proxy)를 띄웁니다. (ref.**14-kube-dashboard-keycloak-proxy.yaml**)
+
+마지막으로 IAM 콘솔에서 kubernetes 클라이언트의 Valid Redirect URLs에 http://k8s.strix.kr/* 을 추가합니다.
