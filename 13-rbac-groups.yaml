@@ -27,7 +27,7 @@ roleRef:
   name: admin
   apiGroup: rbac.authorization.k8s.io
 ---
-# developer has "view" role for namespace prod and default, and has "cluster-view" role
+# developer has "view" role for namespace prod and default
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -72,6 +72,7 @@ rules:
   resources: ["clusterroles", "roles"]
   verbs: ["get", "watch", "list"]
 ---
+# developer has "cluster-view" role
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:

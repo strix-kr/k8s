@@ -337,3 +337,34 @@ kubectl port-forward --namespace kubeapps svc/kubeapps 8080:80
     - 추가로 데이터베이스 접근 패스워드를 Secret에서 읽을 수 있도록 keycloak-postgres-auth Secret을 생성하고, 설치시 helm 차트의 옵션에 반영해줍니다.
     - 추가로 UI 테마를 변경 할 수 있도록 Persistent Volume을 생성하기 위해서 별도의 PVC를 생성하고, 설치시 helm 차트의 옵션에 [반영](https://github.com/helm/charts/tree/master/stable/keycloak#providing-a-custom-theme)해줍니다.
     - 설치 완료 후에 외부에 연결 할 수 있도록 Ingress를 생성해줍니다. 이제 https://iam.strix.kr 로 접속 할 수 있습니다.
+
+## 8. 통합 IAM 적용
+
+### 영역 및 역할 생성
+keycloak 서비스에 접속하여 목적에 맞게 영역(realm)과 역할(role)을 생성합니다.
+- **master** realm
+  - 기본으로 생성되어 있는 영역이며 k8s API, k8s dashboard, kubeapps 등 사내 서비스들에 대한 인증과 접근 제어를 담당합니다. 현시점에서 아래와 같은 역할을 갖습니다.
+    - **admin** role (기본): IAM 전체 시스템에 대한 관리 권한을 갖습니다.
+    - **operator** role: prod/dev 영역에 대한 관리 권한을 갖습니다.
+    - **developer** role: dev 영역에 대한 관리 권한을 갖습니다.
+    - **manager** role: prod/dev 영역의 모든 리소스를 조회하고 유저를 관리 할 수 있습니다.
+  - 역할 관리의 편의를 위해 동일 한 이름의 그룹(group)을 생성하고 위에서 생성한 역할을 그룹에 맵핑합니다.
+  - 관리자 콘솔의 보안을 향상시키기 위해서 추후 OTP 인증 등을 활성화 할 수 있습니다.
+- **prod 및 dev** realm
+  - 추후 배포 환경별로 엔드유저들의 인증과 접근 제어를 담당합니다. 현시점에서는 아무 역할도 등록되지 않았습니다.
+  - 보안을 위해 기본으로 제공되는 클라이언트(keycloak 관리자 콘솔 등)를 모두 비활성화 합니다.
+  
+### k8s API 및 대시보드
+통합 IAM의 인증 서비스를 k8s API 및 대시보드와 연동합니다.
+
+#### k8s RBAC 구성
+k8s의 RBAC 시스템은 기본적으로 활성화되어 있습니다. 리소스 제어 권한을 분리하여 관리하기 위해서 아래의 그룹(k8s Group)에 역할(k8s ClusterRole)을 바인딩합니다.
+
+이 때 직관적인 이해를 위해서 keycloak의 역할과 동일한 이름의 그룹에 역할을 바인딩합니다. 그룹(k8s Group) 자체는 명시적으로 생성하는 리소스가 아니므로 롤 바인딩(k8s ClusterRoleBinding 및 RoleBinding) 리소스만 생성하면 됩니다..
+
+- **operator** group:
+  - k8s 클러스터 리소스의 모든 관리 역할(cluster-admin ClusterRole)을 바인딩합니다.
+- **developer** group:
+  - k8s dev 네임스페이스 리소스의 모든 관리 역할(admin ClusterRole)을 바인딩합니다.
+  - prod 및 default 네임스페이스의 열람 역할(view ClusterRole)을 바인딩합니다.
+  - k8s 특정 클러스터 리소스(namespaces, nodes, persistent volumes, roles, storage classses)의 열람 역할(cluster-view ClusterRole)을 바인딩합니다.
