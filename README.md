@@ -458,14 +458,92 @@ kube-dashboard 접속시 HTTP Authentication 헤더를 확인하고 토큰이 �
 
 먼저 기존 kube-dashboard ingress를 삭제합니다.
 ```
-kubectl delete ingress -n kube-system kube-dashboard
+$ kubectl delete ingress -n kube-system kube-dashboard
 ```
 
 그리고 nginx-ingress controller의 프록시 버퍼 사이즈를 키워줍니다. 기본 설정으로는 OIDC의 클레임을 모두 프록시하지 못해서 정상적으로 작동하지 못합니다.
 ```
-kubectl patch configmap -n default nginx-ingress-controller -p '{"data": {"proxy-buffer-size": "64k"}}'
+$ kubectl patch configmap -n default nginx-ingress-controller -p '{"data": {"proxy-buffer-size": "64k"}}'
 ```
 
 [프록시 서비스](https://github.com/gambol99/keycloak-proxy)를 띄웁니다. (ref.**14-kube-dashboard-keycloak-proxy.yaml**)
 
 마지막으로 IAM 콘솔에서 kubernetes 클라이언트의 Valid Redirect URLs에 http://k8s.strix.kr/* 을 추가합니다.
+
+#### dokuwiki OIDC 적용
+dokuwiki의 oauth 플러그인을 설치하고 dokuwiki 클라이언트와 연동합니다.
+
+#### kubeapps에 service account 생성 및 접근 제어 적용
+kubeapps의 접근 제어에 OIDC는 아직 지원되지 않습니다. (ref. [Github 이슈](https://github.com/kubeapps/kubeapps/issues/385))
+
+OIDC 지원으로 통합 IAM 서비스의 유저 수준의 접근 제어가 가능해지기 전까지, [service account를 통해](https://github.com/kubeapps/kubeapps/blob/master/docs/user/access-control.md) developer와 operator를 구분하는 수준의 접근 제어를 적용합니다.
+
+사전에 정의된 Role 및 ClusterRole들을 생성합니다.
+```
+# kubeapps-applications-read
+$ kubectl -n kubeapps apply -f https://raw.githubusercontent.com/kubeapps/kubeapps/master/docs/user/manifests/kubeapps-applications-read.yaml
+
+# kubeapps-applications-write
+# application 설치 권한은 따로 존재하지 않습니다. edit ClusterRole과 kubeapps-repositories-read Role을 바인딩하면 됩니다.
+
+# kubeapps-repositories-read
+$ kubectl -n kubeapps apply -f https://raw.githubusercontent.com/kubeapps/kubeapps/master/docs/user/manifests/kubeapps-repositories-read.yaml
+
+# kube-apps-repository-write
+$ kubectl -n kubeapps apply -f https://raw.githubusercontent.com/kubeapps/kubeapps/master/docs/user/manifests/kubeapps-repositories-write.yaml
+```
+
+developer와 operator용 service account를 생성합니다.
+```
+$ kubectl create -n kubeapps sa kubeapps-developer
+$ kubectl create -n kubeapps sa kubeapps-operator
+```
+
+developer service account에 default, dev, prod 네임스페이스의 kubeapps-application-read 권한 및 kubeapps-repositories-read 권한을 추가합니다.
+```
+$ kubectl create -n default rolebinding kubeapps-developer-bind-kubeapps-applications-read \
+  --clusterrole=kubeapps-applications-read \
+  --serviceaccount kubeapps:kubeapps-developer
+
+$ kubectl create -n dev rolebinding kubeapps-developer-bind-kubeapps-applications-read \
+  --clusterrole=kubeapps-applications-read \
+  --serviceaccount kubeapps:kubeapps-developer
+
+$ kubectl create -n prod rolebinding kubeapps-developer-bind-kubeapps-applications-read \
+  --clusterrole=kubeapps-applications-read \
+  --serviceaccount kubeapps:kubeapps-developer
+
+$ kubectl create -n kubeapps rolebinding kubeapps-developer-bind-kubeapps-repositories-read \
+  --role=kubeapps-repositories-read \
+  --serviceaccount kubeapps:kubeapps-developer
+```
+
+developer service account가 모든 네임스페이스를 확인 할 수 있도록 위에서 생성한 cluster-view ClusterRole을 추가합니다.
+```
+$ kubectl create clusterrolebinding kubeapps-developer-bind-cluster-view \
+  --clusterrole=cluster-view \
+  --serviceaccount kubeapps:kubeapps-developer
+```
+
+developer service account가 dev 네임스페이스에 소프트웨어를 설치 할 수 있도록 edit ClusterRole 권한을 추가합니다.
+```
+$ kubectl create -n dev rolebinding kubeapps-developer-bind-edit \
+  --clusterrole=edit \
+  --serviceaccount kubeapps:kubeapps-developer
+```
+
+operator service account에게는 cluster-admin ClusterRole을 바인딩합니다.
+```
+$ kubectl create clusterrolebinding kubeapps-operator-bind-cluster-admin \
+  --clusterrole=cluster-admin \
+  --serviceaccount kubeapps:kubeapps-operator
+```
+
+아래 명령어로 각 service account의 토큰을 확인 할 수 있습니다.
+```
+$ kubectl get -n kubeapps secret $(kubectl get -n kubeapps sa kubeapps-developer -o jsonpath='{.secrets[].name}') -o jsonpath='{.data.token}' | base64 --decode; echo
+
+$ kubectl get -n kubeapps secret $(kubectl get -n kubeapps sa kubeapps-operator -o jsonpath='{.secrets[].name}') -o jsonpath='{.data.token}' | base64 --decode; echo
+```
+
+## 9. 개발 및 배포 프로세스
