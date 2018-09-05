@@ -470,10 +470,10 @@ $ kubectl patch configmap -n default nginx-ingress-controller -p '{"data": {"pro
 
 마지막으로 IAM 콘솔에서 kubernetes 클라이언트의 Valid Redirect URLs에 http://k8s.strix.kr/* 을 추가합니다.
 
-#### dokuwiki OIDC 적용
+### dokuwiki OIDC 적용
 dokuwiki의 oauth 플러그인을 설치하고 dokuwiki 클라이언트와 연동합니다.
 
-#### kubeapps에 service account 생성 및 접근 제어 적용
+### kubeapps에 service account 생성 및 접근 제어 적용
 kubeapps의 접근 제어에 OIDC는 아직 지원되지 않습니다. (ref. [Github 이슈](https://github.com/kubeapps/kubeapps/issues/385))
 
 OIDC 지원으로 통합 IAM 서비스의 유저 수준의 접근 제어가 가능해지기 전까지, [service account를 통해](https://github.com/kubeapps/kubeapps/blob/master/docs/user/access-control.md) developer와 operator를 구분하는 수준의 접근 제어를 적용합니다.
