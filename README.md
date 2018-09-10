@@ -547,3 +547,100 @@ $ kubectl get -n kubeapps secret $(kubectl get -n kubeapps sa kubeapps-operator 
 ```
 
 ## 9. 개발 및 배포 프로세스
+
+### Docker 레지스트리 구성
+
+#### keycloak 클라이언트 추가
+keycloak은 docker-v2 인증 프로토콜을 지원하지만 기본적으로 비활성화되어있습니다. kubeapps에 접속하여 keycloak helm 차트의 extraArgs에 "-Dkeycloak.profile.feature.docker=enabled"를 추가하여 재배포합니다. 
+
+keycloak이 다시 실행하면 관리자 콘솔에 접속하여 docker-registry 클라이언트를 master realm에 등록합니다.
+AKIAJ6MSY3YE74GKBHVA
+F8sZ9H7Upz4LZXWW3D9Wa3exFo89gYCxtaH7nS7B
+
+#### AWS S3 버킷 생성
+AWS S3에 새로운 버킷 registry.k8s.strix.kr를 생성하고, S3의 Full Access 권한을 갖는 AWS IAM 유저 registry.k8s.strix.kr를 추가합니다.
+
+#### Docker 레지스트리 배포
+다음으로 kubeapps에 접속하여 docker-registry를 default 네임스페이스 배포합니다.
+- storage 옵션을 s3로 설정하고 미리 생성한 버킷과 IAM 액세스 토큰 정보를 기입합니다.
+- ingress 생성을 활성화하고 registry.k8s.strix.kr 도메인을 할당합니다. 이때 ingress annotation에 `nginx.ingress.kubernetes.io/proxy-body-size: "500m"`을 추가합니다.
+- configData 옵션에 keycloak에서 생성한 docker-registry 클라이언트의 installation 항목에서 확인 할 수 있는 [Docker 레지스트리 인증 설정](https://docs.docker.com/registry/configuration) 항목을 복사해 기입합니다. 이때 추가로 rootcertbundle 항목을 기입합니다. 해당 항목은 root CA(keycloak)의 인증서 경로를 가리킵니다. 해당 helm 차트에서 바로 Secret을 마운트 할 수 있는 방법이 없어 우선 root cert의 경로를 임의로 지정합니다.
+
+```
+  auth:
+    token:
+      realm: https://iam.k8s.strix.kr/realms/master/protocol/docker-v2/auth
+      service: docker-registry
+      issuer: https://iam.k8s.strix.kr/realms/master
+      rootcertbundle: /root/ca.pem
+```
+
+배포후 `/root/ca.pem` 파일 찾을 수 없어서 오류가 납니다. CA 인증서는 keycloak IAM 콘솔에서 realm 설정 > Keys 탭에서 찾을 수 있습니다. 배포시 생성된 **docker-registry-secret** Secret를 재활용해서 **ca.pem**이라는 키를 추가해줍니다. 이후 해당 Secret을 볼륨에 마운트해서 임의 지정한 경로를 맞춰줍니다.
+
+```
+$ echo -n "
+-----BEGIN CERTIFICATE-----
+<keycloak의 CA 인증서>
+-----END CERTIFICATE-----" | base64
+
+$ kubectl patch secret/docker-registry-secret -n default --type json -p '[
+  {
+    "op": "add",
+    "path": "/data/ca.pem",
+    "value": "<위에 출력한 base64 인코딩된 ca.pem>"
+  }
+]'
+
+$ kubectl patch deployment/docker-registry -n default --type json -p '[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/volumes/1",
+    "value": {
+      "name": "docker-registry-secret",
+      "secret": {
+        "secretName": "docker-registry-secret"
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/volumeMounts/1",
+    "value": {
+      "name": "docker-registry-secret",
+      "mountPath": "/root"
+    }
+  }
+]'
+```
+
+이제 https://registry.k8s.strix.kr 로 접속 할 수 있습니다. 만약 503 에러가 발생한다면 [버킷이 비어있는 경우의 버그](https://github.com/docker/distribution/issues/2292#issuecomment-378521123) 일 수 있습니다. 웹 브라우저로의 접속에 문제가 없다면 docker cli로 IAM 연동을 확인합니다.
+```
+$ docker login https://registry.k8s.strix.kr
+Username: donguk.kim@strix.co.kr
+Password:
+Login Succeeded
+```
+
+#### k8s에 이미지 풀링용 Secret 구성
+IAM에 가상의 유저 registry.k8s.strix.kr를 등록해주고 해당유저의 정보를 기반으로 Secret 리소스를 생성합니다. 이 Secret **local**은 이후 배포 할때마다 사용됩니다.
+
+```
+$ kubectl -n default create secret docker-registry local-docker-registry-secret --docker-server=registry.k8s.strix.kr --docker-username=registry.k8s.strix.kr --docker-password=password
+
+$ kubectl -n dev create secret docker-registry local-docker-registry-secret --docker-server=registry.k8s.strix.kr --docker-username=registry.k8s.strix.kr --docker-password=password
+
+$ kubectl -n prod create secret docker-registry local-docker-registry-secret --docker-server=registry.k8s.strix.kr --docker-username=registry.k8s.strix.kr --docker-password=password
+```
+
+매번 Deployment 스펙에 imagePullSecrets 항목을 적어 줄 수도 있지만 각 네임스페이스의 **default** service account에 imagePullSecrets을 [지정](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#add-imagepullsecrets-to-a-service-account)해두면 번거로움이 없어집니다.
+
+```
+$ kubectl patch sa default -n default -p '{"imagePullSecrets": [{"name": "local-docker-registry-secret"}]}'
+$ kubectl patch sa default -n prod -p '{"imagePullSecrets": [{"name": "local-docker-registry-secret"}]}'
+$ kubectl patch sa default -n dev -p '{"imagePullSecrets": [{"name": "local-docker-registry-secret"}]}'
+```
+
+#### CI 플랫폼 Jenkins 구축
+
+[Jenkins](https://github.com/jenkinsci/kubernetes-plugin)는 빌드 및 배포 파이프라인을 구성 할 수 있는 오픈소스 CI/CD 소프트웨어입니다. (ref. **15-jenkins-ingress.yaml**)
+    - jenkins 서비스를 연결하는 Ingress를 생성합니다. 이제 https://deploy.k8s.strix.kr 로 접속 할 수 있습니다.
