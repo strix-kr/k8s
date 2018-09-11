@@ -642,5 +642,5 @@ $ kubectl patch sa default -n dev -p '{"imagePullSecrets": [{"name": "local-dock
 
 #### CI 플랫폼 Jenkins 구축
 
-[Jenkins](https://github.com/jenkinsci/kubernetes-plugin)는 빌드 및 배포 파이프라인을 구성 할 수 있는 오픈소스 CI/CD 소프트웨어입니다. (ref. **15-jenkins-ingress.yaml**)
+[Jenkins](https://github.com/jenkinsci/kubernetes-plugin)는 빌드 및 배포 파이프라인을 구성 할 수 있는 오픈소스 CI/CD 소프트웨어입니다. (ref. **16-jenkins-ingress.yaml**)
     - jenkins 서비스를 연결하는 Ingress를 생성합니다. 이제 https://deploy.k8s.strix.kr 로 접속 할 수 있습니다.
