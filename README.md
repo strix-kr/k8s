@@ -56,6 +56,32 @@ $ kops create cluster \
 - 기본적인 클러스터 구성 변경 및 업그레이드 가이드:
   https://github.com/kubernetes/kops/blob/master/docs/cli/kops_rolling-update.md
 
+### 특수 기능 활성화
+동적으로 볼륨 크기를 조절하기 위해서 클러스터를 업데이트합니다. 위 가이드를 따라 롤링 업데이트까지 마칩니다.
+```
+$ kops edit cluter
+
+...
+kubeAPIServer:
+  admissionControl:
+  - PersistentVolumeClaimResize
+  featureGates:
+    ExpandPersistentVolumes: "true"
+kubeControllerManager:
+  featureGates:
+    ExpandPersistentVolumes: "true"
+kubelet:
+  featureGates:
+    ExpandPersistentVolumes: "true"
+...
+```
+
+클러스터가 업데이트된 후에 StorageClass 리소스의 특수 기능을 활성화합니다.
+```
+$ kubectl patch storageclass default -p '{"allowVolumeExpansion": true}'
+$ kubectl patch storageclass gp2 -p '{"allowVolumeExpansion": true}'
+```
+
 ### 문제 해결
 1. [롤링 업데이트](https://github.com/kubernetes/kops/blob/master/docs/cli/kops_rolling-update.md) 도중 예기치 못한 이유로 노드 방출에 실패하여 클러스터가 마비되는 경우.
 ```
@@ -267,12 +293,12 @@ $ kubectl -n kube-system exec -it ${KR_POD} bash
 
 k8s가 위치한 EC2 인스턴스의 VPC(k8s.strix.kr VPC)와 RDS 인스턴스의 VPC(db.k8s.strix.kr VPC)를 [피어링](https://docs.aws.amazon.com/ko_kr/AmazonVPC/latest/PeeringGuide/vpc-peering-basics.html)합니다.
 
-- RDS 인스턴스에 할당된 도메인을 소유한 DNS 존에 CNAME 레코드로 연결하고 이후에는 생성한 레코드의 도메인으로 접근합니다.
+- RDS 인스턴스에 할당된 도메인을 k8s 로컬 DNS 존에 CNAME 레코드로 연결(ExternalName 서비스 생성)하고 이후에는 생성한 레코드의 도메인으로 접근합니다.
 - 인터넷 접근을 허용하려면 RDS 인스턴스의 인터넷 접근을 허용하고, 제한된 public CIDR/IP 내에서 inbound를 허용하는 보안 그룹(현 시점에서 **internet-db.k8s.strix.kr**로 구성)을 추가로 적용합니다.
   - 인터넷 접근이 활성화된 RDS에 할당된 도메인은 VPC 내부에서는 private IP로 외부에서는 public IP로 해석됩니다.
 - k8s VPC 내에서 private IP로의 접근을 허용하려면 private inbound를 허용하는 보안 그룹(현 시점에서 **peering-db.k8s.strix.kr**로 구성)을 적용합니다. 이를 통해 헤어핀 트래픽을 방지합니다.
 
-이렇게 RDS가 할당한 도메인을 다시 한번 소유한 DNS 존의 CNAME 레코드로 연결하면 (ex. my.db.k8s.strix.kr -> blabla-blabla.blabla.ap-northeast-2.rds.amazonaws.com), 추후 RDS 엔드포인트의 변경에 빠르게 대응 할 수 있습니다.
+이렇게 RDS가 할당한 도메인을 k8s의 ExternalName 서비스로 연결하면 (ex. my.db.k8s.aws.blabla.com -> my.db), 추후 RDS 엔드포인트의 변경에 빠르게 대응 할 수 있습니다.
 
 
 ## 6. 패키지 설치 도구
@@ -336,6 +362,7 @@ $ kubectl port-forward --namespace kubeapps svc/kubeapps 8080:80
     
 - [default/keycloak](https://www.keycloak.org):
   오픈소스 통합 IAM 소프트웨어입니다. 이 통합 IAM 서비스에 RBAC 체계로 지금까지 등록한 내부 서비스의 접근을 제어하게됩니다. 또한 외부 서비스의 인증 및 접근 제어 역시 통합 IAM에 등록되어 관리됩니다. (ref. **12-keycloak-secret-pvc-ingress.yaml**)
+    - 이미지를 4.3.0-Final로 교체합니다.
     - 본 서비스는 핵심적인 production 데이터를 관리하기에 데이터베이스 구성 및 관리를 AWS RDS에 위임합니다. AWS RDS에서 Postgres 데이터베이스를 피어링된 VPC 안에 구성하고 도메인을 할당하여, 설치시 helm 차트의 옵션에 반영해줍니다.
     - 추가로 데이터베이스 접근 패스워드를 Secret에서 읽을 수 있도록 keycloak-postgres-auth Secret을 생성하고, 설치시 helm 차트의 옵션에 반영해줍니다.
     - 추가로 UI 테마를 변경 할 수 있도록 Persistent Volume을 생성하기 위해서 별도의 PVC를 생성하고, 설치시 helm 차트의 옵션에 [반영](https://github.com/helm/charts/tree/master/stable/keycloak#providing-a-custom-theme)해줍니다.
@@ -550,70 +577,60 @@ $ kubectl get -n kubeapps secret $(kubectl get -n kubeapps sa kubeapps-operator 
 
 ### Docker 레지스트리 구성
 
-#### keycloak 클라이언트 추가
-keycloak은 docker-v2 인증 프로토콜을 지원하지만 기본적으로 비활성화되어있습니다. kubeapps에 접속하여 keycloak helm 차트의 extraArgs에 "-Dkeycloak.profile.feature.docker=enabled"를 추가하여 재배포합니다. 
+kubeapps를 통해서 도커 레지스트리 및 각 종 플랫폼 패키지를 저장 할 수 있는 [nexus](https://www.sonatype.com/nexus-repository-sonatype)를 설치합니다. 이 때 nexus 이미지를 **dehypnosis/nexus-3.13.0-keycloak-4.3.0.final:stable**로 교체합니다. 이 이미지에는 nexus 3.13.0 이미지를 베이스로 [keycloak 인증 플러그인](https://github.com/dehypnosis/nexus3-keycloak-plugin)이 설치되어 있습니다. 
 
-keycloak이 다시 실행하면 관리자 콘솔에 접속하여 docker-registry 클라이언트를 master realm에 등록합니다.
-AKIAJ6MSY3YE74GKBHVA
-F8sZ9H7Upz4LZXWW3D9Wa3exFo89gYCxtaH7nS7B
+ingress는 다음처럼 구성되었습니다.
+  - https://repository.ks8.strix.kr 로 nexus web UI에 접속 할 수 있습니다.
+  - https://registory.ks8.strix.kr 로 docker registry에 접속 할 수 있습니다.
 
-#### AWS S3 버킷 생성
-AWS S3에 새로운 버킷 registry.k8s.strix.kr를 생성하고, S3의 Full Access 권한을 갖는 AWS IAM 유저 registry.k8s.strix.kr를 추가합니다.
-
-#### Docker 레지스트리 배포
-다음으로 kubeapps에 접속하여 docker-registry를 default 네임스페이스 배포합니다.
-- storage 옵션을 s3로 설정하고 미리 생성한 버킷과 IAM 액세스 토큰 정보를 기입합니다.
-- ingress 생성을 활성화하고 registry.k8s.strix.kr 도메인을 할당합니다. 이때 ingress annotation에 `nginx.ingress.kubernetes.io/proxy-body-size: "500m"`을 추가합니다.
-- configData 옵션에 keycloak에서 생성한 docker-registry 클라이언트의 installation 항목에서 확인 할 수 있는 [Docker 레지스트리 인증 설정](https://docs.docker.com/registry/configuration) 항목을 복사해 기입합니다. 이때 추가로 rootcertbundle 항목을 기입합니다. 해당 항목은 root CA(keycloak)의 인증서 경로를 가리킵니다. 해당 helm 차트에서 바로 Secret을 마운트 할 수 있는 방법이 없어 우선 root cert의 경로를 임의로 지정합니다.
+설치 후 nexus에 접속 한 후 nexus용 [keycloak 클라이언트를 구성](https://github.com/flytreeleft/nexus3-keycloak-plugin#4-configure-keycloak-realm-client)합니다. 플러그인을 활성화하고 롤 맵핑을 구성한 후에 keycloak OIDC의 설정 파일(keycloak.json)을 설치 디렉토리에 카피하면 연동이 마무리됩니다. 하지만 셸을 통해 수동으로 처리하면 Pod이 재생성 될때마다 이 작업을 매번 반복해야합니다. 이를 해결하기 위해서 keycloak.json을 Secret에 담고 생성한 Secret을 알맞은 경로에 마운트하도록 Deployment를 패치합니다.
 
 ```
-  auth:
-    token:
-      realm: https://iam.k8s.strix.kr/realms/master/protocol/docker-v2/auth
-      service: docker-registry
-      issuer: https://iam.k8s.strix.kr/realms/master
-      rootcertbundle: /root/ca.pem
-```
+$ echo '{
+  "realm": "master",
+  "auth-server-url": "https://iam.k8s.strix.kr/",
+  "ssl-required": "external",
+  "resource": "nexus",
+  "credentials": {
+    "secret": "<nexus 클라이언트 시크릿>"
+  },
+  "use-resource-role-mappings": true,
+  "confidential-port": 0
+}' > ./keycloak.json \
+ && kubectl -n default create secret generic nexus-keycloak-oidc --from-file=keycloak.json=./keycloak.json \
+ && rm ./keycloak.json
 
-배포후 `/root/ca.pem` 파일 찾을 수 없어서 오류가 납니다. CA 인증서는 keycloak IAM 콘솔에서 realm 설정 > Keys 탭에서 찾을 수 있습니다. 배포시 생성된 **docker-registry-secret** Secret를 재활용해서 **ca.pem**이라는 키를 추가해줍니다. 이후 해당 Secret을 볼륨에 마운트해서 임의 지정한 경로를 맞춰줍니다.
-
-```
-$ echo -n "
------BEGIN CERTIFICATE-----
-<keycloak의 CA 인증서>
------END CERTIFICATE-----" | base64
-
-$ kubectl patch secret/docker-registry-secret -n default --type json -p '[
+$ kubectl patch deployment/nexus-sonatype-nexus -n default --type json -p '[
   {
     "op": "add",
-    "path": "/data/ca.pem",
-    "value": "<위에 출력한 base64 인코딩된 ca.pem>"
-  }
-]'
-
-$ kubectl patch deployment/docker-registry -n default --type json -p '[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/volumes/1",
+    "path": "/spec/template/spec/volumes/2",
     "value": {
-      "name": "docker-registry-secret",
+      "name": "nexus-keycloak-oidc",
       "secret": {
-        "secretName": "docker-registry-secret"
+        "secretName": "nexus-keycloak-oidc",
+        "defaultMode": 0644
       }
     }
   },
   {
     "op": "add",
-    "path": "/spec/template/spec/containers/0/volumeMounts/1",
+    "path": "/spec/template/spec/containers/0/volumeMounts/2",
     "value": {
-      "name": "docker-registry-secret",
-      "mountPath": "/root"
+      "name": "nexus-keycloak-oidc",
+      "mountPath": "/opt/sonatype/nexus/etc/keycloak.json",
+      "subPath": "keycloak.json"
     }
   }
 ]'
 ```
 
-이제 https://registry.k8s.strix.kr 로 접속 할 수 있습니다. 만약 503 에러가 발생한다면 [버킷이 비어있는 경우의 버그](https://github.com/docker/distribution/issues/2292#issuecomment-378521123) 일 수 있습니다. 웹 브라우저로의 접속에 문제가 없다면 docker cli로 IAM 연동을 확인합니다.
+이후 Docker 레지스트리 및 필요한 저장소를 구성합니다. 이미지 업로드시 413 오류를 방지하기 위해서 nginx-ingress-controller의 ConfigMap에 proxy-body-size (client_max_body_size)를 증가시켜줍니다.
+
+```
+"proxy-body-size": "1G",
+```
+
+이제 https://registry.k8s.strix.kr 로 접속 할 수 있습니다. 웹 브라우저로의 접속에 문제가 없다면 docker cli로 IAM 연동을 확인합니다.
 ```
 $ docker login https://registry.k8s.strix.kr
 Username: donguk.kim@strix.co.kr
@@ -621,8 +638,8 @@ Password:
 Login Succeeded
 ```
 
-#### k8s에 이미지 풀링용 Secret 구성
-IAM에 가상의 유저 registry.k8s.strix.kr를 등록해주고 해당유저의 정보를 기반으로 Secret 리소스를 생성합니다. 이 Secret **local**은 이후 배포 할때마다 사용됩니다.
+### k8s에 이미지 풀링용 Secret 구성
+IAM에 가상의 유저 registry.k8s.strix.kr를 등록하고 nexus에서 docker registry 읽기 권한을 줍니다. 해당 유저의 정보를 기반으로 Secret 리소스를 생성합니다. 이 Secret **local**은 이후 배포 할때마다 사용됩니다.
 
 ```
 $ kubectl -n default create secret docker-registry local-docker-registry-secret --docker-server=registry.k8s.strix.kr --docker-username=registry.k8s.strix.kr --docker-password=password
@@ -640,7 +657,7 @@ $ kubectl patch sa default -n prod -p '{"imagePullSecrets": [{"name": "local-doc
 $ kubectl patch sa default -n dev -p '{"imagePullSecrets": [{"name": "local-docker-registry-secret"}]}'
 ```
 
-#### CI 플랫폼 Jenkins 구축
+### CI 플랫폼 Jenkins 구축
 
 [Jenkins](https://github.com/jenkinsci/kubernetes-plugin)는 빌드 및 배포 파이프라인을 구성 할 수 있는 오픈소스 CI/CD 소프트웨어입니다. (ref. **16-jenkins-ingress.yaml**)
     - jenkins 서비스를 연결하는 Ingress를 생성합니다. 이제 https://deploy.k8s.strix.kr 로 접속 할 수 있습니다.

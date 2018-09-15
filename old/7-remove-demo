@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-
-kubectl delete -f ./6-demo.yaml
-
-

@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-
-helm install --name keycloak --namespace default --set keycloak.username=admin,keycloak.persistence.deployPostgres=true,keycloak.persistence.dbVendor=postgres,postgresql.persistence.enabled=true,postgresql.persistence.storageClass=standard stable/keycloak
-
-

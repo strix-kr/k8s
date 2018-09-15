@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-helm install --name mediawiki --namespace default --set mediawikiUser=admin,mediawikiEmail=info@strix.co.kr,mediawikiName="STRIX Wiki",service.type=ClusterIP stable/mediawiki
