@@ -573,9 +573,9 @@ $ kubectl get -n kubeapps secret $(kubectl get -n kubeapps sa kubeapps-developer
 $ kubectl get -n kubeapps secret $(kubectl get -n kubeapps sa kubeapps-operator -o jsonpath='{.secrets[].name}') -o jsonpath='{.data.token}' | base64 --decode; echo
 ```
 
-## 9. 개발 및 배포 프로세스
+## 9. Docker 레지스트리 구축
 
-### Docker 레지스트리 구성
+### 패키지 매니저 Nexus 설치
 
 kubeapps를 통해서 도커 레지스트리 및 각 종 플랫폼 패키지를 저장 할 수 있는 [nexus](https://www.sonatype.com/nexus-repository-sonatype)를 설치합니다. 이 때 nexus 이미지를 **dehypnosis/nexus-3.13.0-keycloak-4.3.0.final:stable**로 교체합니다. 이 이미지에는 nexus 3.13.0 이미지를 베이스로 [keycloak 인증 플러그인](https://github.com/dehypnosis/nexus3-keycloak-plugin)이 설치되어 있습니다. 
 
@@ -657,7 +657,81 @@ $ kubectl patch sa default -n prod -p '{"imagePullSecrets": [{"name": "local-doc
 $ kubectl patch sa default -n dev -p '{"imagePullSecrets": [{"name": "local-docker-registry-secret"}]}'
 ```
 
-### CI 플랫폼 Jenkins 구축
+## 10. 서비스간 인터페이스를 위한 인프라 구축
+
+시스템 내부에서 서비스간 gRPC 통신을 지원하고 이벤트 구독-발행 모델을 지원하도록 합니다.
+
+### 공유 protobuf 저장소 구축
+
+gRPC 통신을 위한 proto 스펙 및 각종 부산물(랭귀지 바인딩, 문서)을 공유하기 위해서 git subtree merge 전략을 활용한 공유 저장소를 구성합니다.
+[이 저장소](https://github.com/strix-kr/protobuf)에는 protoc를 활용한 빌더 이미지 및 빌드 스크립트, 각종 서비스들의 proto 파일, 통합 스펙 문서가 존재합니다.
+
+### 이벤트 버스 구축
+
+#### Kafka 설치
+메세지 큐 또는 이벤트 소싱 인프라로 [kafka](https://kafka.apache.org/documentation/#gettingStarted)를 선택했습니다.
+kubeapps에서 kafka를 설치하고 테스트 및 운영용 클라이언트(**ref 15-kafka-busybox.yaml**)를 배포합니다.
+
+- 추후 kafka의 로그 및 메트릭은 ELK 스택으로 수집 할 예정입니다.
+- 추후 kafka의 토픽 및 컨슈머 그룹 제어, 구독 및 발행은 추가 어댑터 소프트웨어(gRPC proxy)로 제어 할 예정입니다.
+
+운영상 kafka를 직접 제어할 일이 있다면 아래와 같은 클라이언트 Pod을 띄워 제어 할 수 있습니다.
+```
+$ echo '
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kafka-client
+  namespace: default
+spec:
+  containers:
+  - name: kafka
+    image: confluentinc/cp-kafka:4.1.2-2
+    command:
+    - sh
+    - -c
+    - "exec tail -f /dev/null"' | kubectl apply -f -
+
+---
+Once you have the kafka-client pod above running, you can list all kafka
+topics with:
+
+kubectl -n default exec kafka-client -- /usr/bin/kafka-topics --zookeeper kafka-zookeeper:2181 --list
+
+To create a new topic:
+
+kubectl -n default exec kafka-client -- /usr/bin/kafka-topics --zookeeper kafka-zookeeper:2181 --topic test1 --create --partitions 1 --replication-factor 1
+
+To listen for messages on a topic:
+
+kubectl -n default exec -ti kafka-client -- /usr/bin/kafka-console-consumer --bootstrap-server kafka-kafka:9092 --topic test1 --from-beginning
+
+To stop the listener session above press: Ctrl+C
+
+To start an interactive message producer session:
+kubectl -n default exec -ti kafka-client -- /usr/bin/kafka-console-producer --broker-list kafka-kafka-headless:9092 --topic test1
+
+To create a message in the above session, simply type the message and press "enter"
+To end the producer session try: Ctrl+C
+---
+
+$ kubectl -n default delete pod kafka-client
+```
+
+#### Kafka gRPC 프록시 설치 및 이벤트 버스 마이크로 서비스 구현
+
+Kafka에 대한 anti corruption layer 및 gRPC 인터페이스를 제공하기 위해서 **kafka <-> kafka gRPC Proxy <-> common-events** 로 이루어지는 계층을 구성합니다.
+
+- [kafka gRPC proxy](https://github.com/mailgun/kafka-pixy)를 클러스터의 kafka 설정에 맞게 구성하고 배포합니다. (**ref. 15-kafka-pixy.yaml**)
+- **첫번째 마이크로 서비스**인 [common-events](https://github.com/strix-kr/common-events)를 구현 및 배포합니다.
+  - API 스펙을 proto로 구성하고 protobuf 공유 저장소에 업로드합니다.
+  - 자체 저장소에 k8s 스펙을 구성하고 배포합니다.
+  - 추후에 배포 파이프라인을 구성해 배포를 자동화합니다.
+
+
+## 11. 배포 프로세스 구축
+
+### CI 플랫폼 Jenkins 설치
 
 [Jenkins](https://github.com/jenkinsci/kubernetes-plugin)는 빌드 및 배포 파이프라인을 구성 할 수 있는 오픈소스 CI/CD 소프트웨어입니다. (ref. **16-jenkins-ingress.yaml**)
     - jenkins 서비스를 연결하는 Ingress를 생성합니다. 이제 https://deploy.k8s.strix.kr 로 접속 할 수 있습니다.
