@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: rabbitmq
+  namespace: default
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+  - secretName: events-k8s-strix-kr
+    hosts:
+    - events.k8s.strix.kr
+  rules:
+  - host: events.k8s.strix.kr
+    http:
+      paths:
+      - backend:
+          serviceName: rabbitmq-rabbitmq-ha
+          servicePort: 15672
+        path: /
+---
