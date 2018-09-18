@@ -6,8 +6,8 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: kube-dashboard-keycloak-proxy
   namespace: kube-system
+  name: kube-dashboard-keycloak-proxy
 spec:
   replicas: 1
   template:
@@ -16,15 +16,14 @@ spec:
         app: kube-dashboard-keycloak-proxy
     spec:
       containers:
-      - image: quay.io/gambol99/keycloak-proxy:v2.1.1
+      - image: quay.io/gambol99/keycloak-proxy:v2.3.0
         name: kube-dashboard-keycloak-proxy
         args:
           - --listen=0.0.0.0:3000
           - --discovery-url=https://iam.k8s.strix.kr/realms/master
           - --client-id=kubernetes
           - --client-secret=1e117a20-3f0c-4648-acec-18a81f8f41fe
-          - --redirection-url=https://k8s.strix.kr
-          - --enable-refresh-tokens=true
+          - --enable-session-cookies=true
           - --encryption-key=MsVRtDTD3TPXaI6bfAxfBvHUKUhjjXOn    # 32 bytes string
           - --upstream-url=https://kube-dashboard.kube-system.svc.cluster.local
           - --resources=uri=/*

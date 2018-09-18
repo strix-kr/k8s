@@ -664,15 +664,19 @@ $ kubectl patch sa default -n dev -p '{"imagePullSecrets": [{"name": "local-dock
 ### 공유 protobuf 저장소 구축
 
 gRPC 통신을 위한 proto 스펙 및 각종 부산물(랭귀지 바인딩, 문서)을 공유하기 위해서 git subtree merge 전략을 활용한 공유 저장소를 구성합니다.
-[이 저장소](https://github.com/strix-kr/protobuf)에는 protoc를 활용한 빌더 이미지 및 빌드 스크립트, 각종 서비스들의 proto 파일, 통합 스펙 문서가 존재합니다.
+[protobuf 저장소](https://github.com/strix-kr/protobuf)에는 protoc를 활용한 빌더 이미지 및 빌드 스크립트, 각종 서비스들의 proto 파일, 통합 스펙 문서가 존재합니다.
 
-### 메세지 큐 구축
+### 메세지 큐 및 gRPC 프록시 구축
 
-#### RabbitMQ 설치
+kubeapps에서 RabbitMQ를 설치하고 management 웹 서비스와 연결되는 ingress를 생성합니다. (**ref. 15-rabbitmq-ingress.yaml**) 설치시에 기본 vhost를 dev로 설정하고 HA 설정은 prod vhost에 대해서만 구성합니다. 이제 https://events.k8s.strix.kr 로 접속 할 수 있습니다.
 
-kubeapps에서 RabbitMQ(HA)를 설치합니다.
-keycloak proxy
-nginx "large-client-header-buffers": "4 64k"
+kubeapps처럼 OIDC 및 OAuth2 인증을 제공하지 않기에 당장은 권한별로 계정만 생성하여 접근 제어합니다. management 웹에 접속해 prod vhost를 생성하고 developer 계정을 생성하고 권한을 부여합니다. developer 계정은 dev vhost의 관리자 권한이 있고, prod vhost의 읽기 권한을 부여합니다.
+
+설정된 operator 관리자 패스워드는 아래와 같이 확인 할 수 있습니다.
+```
+$ kubectl get secret -n default rabbitmq -o jsonpath="{.data.rabbitmq-password}" | base64 --decode; echo
+```
+이후 RabbitMQ 제어를 추상화하며 gRPC 인터페이스를 제공하는 프록시 [events](https://github.com/strix-kr/events) 서비스를 작성하고 dev/prod 네임스페이스에 각각 배포합니다.
 
 ## 11. 배포 프로세스 구축
 
