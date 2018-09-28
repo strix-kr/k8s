@@ -639,7 +639,7 @@ Login Succeeded
 ```
 
 ### k8s에 이미지 풀링용 Secret 구성
-IAM에 가상의 유저 registry.k8s.strix.kr를 등록하고 nexus에서 docker registry 읽기 권한을 줍니다. 해당 유저의 정보를 기반으로 Secret 리소스를 생성합니다. 이 Secret **local**은 이후 배포 할때마다 사용됩니다.
+IAM에 가상의 유저 registry.k8s.strix.kr를 등록하고 nexus에서 docker registry 읽기 및 쓰기 권한을 줍니다. 해당 유저의 정보를 기반으로 Secret 리소스를 생성합니다. 이 Secret **local-docker-registry-secret**은 Pod 생성 중 이미지를 풀링 할 때나, 추후 배포 자동화에서 Jenkins Agent의 docker 계정으로 사용됩니다.
 
 ```
 $ kubectl -n default create secret docker-registry local-docker-registry-secret --docker-server=registry.k8s.strix.kr --docker-username=registry.k8s.strix.kr --docker-password=password
@@ -680,7 +680,13 @@ $ kubectl get secret -n default rabbitmq -o jsonpath="{.data.rabbitmq-password}"
 
 ## 11. 배포 프로세스 구축
 
-### CI 플랫폼 Jenkins 설치
+### CI 플랫폼 Jenkins 설치 및 IAM 연동, Agent 구성
 
-[Jenkins](https://github.com/jenkinsci/kubernetes-plugin)는 빌드 및 배포 파이프라인을 구성 할 수 있는 오픈소스 CI/CD 소프트웨어입니다. (ref. **16-jenkins-ingress.yaml**)
-    - jenkins 서비스를 연결하는 Ingress를 생성합니다. 이제 https://deploy.k8s.strix.kr 로 접속 할 수 있습니다.
+[Jenkins](https://jenkins.io)는 빌드 및 배포 파이프라인을 구성 할 수 있는 오픈소스 CI/CD 소프트웨어입니다.
+  - Jenkins web 서비스를 연결하는 Ingress를 생성합니다. 이제 https://deploy.k8s.strix.kr 로 접속 할 수 있습니다. (ref. **16-jenkins-ingress-and-service-account.yaml**)
+  - Keycloak 콘솔에서 **jenkins** 클라이언트를 생성하고 Jenkins [Keycloak Authentication Plugin](http://wiki.jenkins.io/display/JENKINS/keycloak-plugin)을 통해 OIDC로 연동합니다.
+  - Jenkins [Kubernetes Plugin](https://wiki.jenkins-ci.org/display/JENKINS/Kubernetes+Plugin)을 통해 빌드 Agent를 k8s의 Pod으로 띄우도록 설정합니다.
+    - Agent가 docker 및 kubectl 클라이언트를 이용 할 수 있도록 전용 [jenkins-agent](https://github.com/strix-kr/jenkins-agent) docker image를 구성합니다. (자세한 구성은 해당 저장소 README 참조)
+    - Agent가 registry.k8s.strix.kr docker registry에 로그인하고 푸시 할 수 있도록 dev 네임스페이스의 **local-docker-registry-secret**(위에서 생성한) Secret을 Agent Pod에 볼륨으로 마운트되도록 템플릿을 구성합니다.
+    - Agent가 kubectl을 통해 kubenetes API에 접근 할 수 있도록 dev 네임스페이스에 쓰기 권한을 갖는 **jenkins-agent** Service Account를 생성하고 Agent Pod의 Service Account로 설정되도록 템플릿을 구성합니다. (ref. **16-jenkins-ingress-and-service-account.yaml**)
+    
