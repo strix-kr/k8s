@@ -1,0 +1,77 @@
+# After setup keycloak, have created "kubernetes" IAM client.
+# ref: https://www.keycloak.org/docs/3.0/authorization_services/topics/resource-server/create-client.html
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: default
+  name: efk-kibana-keycloak-proxy
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: efk-kibana-keycloak-proxy
+    spec:
+      containers:
+      - image: quay.io/gambol99/keycloak-proxy:v2.3.0
+        name: efk-kibana-keycloak-proxy
+        args:
+          - --listen=0.0.0.0:3000
+          - --discovery-url=https://iam.k8s.strix.kr/realms/master
+          - --client-id=kubernetes
+          - --client-secret=1e117a20-3f0c-4648-acec-18a81f8f41fe
+          - --enable-session-cookies=false
+          - --encryption-key=MsVRtDTD3TPXaI6bfAxfBvHUKUhjjXOn    # 32 bytes string
+          - --upstream-url=http://efk-kibana.default.svc.cluster.local:443
+          - --resources=uri=/*
+        ports:
+        - containerPort: 3000
+        livenessProbe:
+          httpGet:
+            path: /oauth/health
+            port: 3000
+          initialDelaySeconds: 3
+          timeoutSeconds: 2
+        readinessProbe:
+          httpGet:
+            path: /oauth/health
+            port: 3000
+          initialDelaySeconds: 3
+          timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: efk-kibana-keycloak-proxy
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+  - protocol: TCP
+    port: 3000
+    targetPort: 3000
+  selector:
+    app: efk-kibana-keycloak-proxy
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: efk-kibana-keycloak-proxy
+  namespace: default
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+  - secretName: logs-k8s-strix-kr
+    hosts:
+    - logs.k8s.strix.kr
+  rules:
+  - host: logs.k8s.strix.kr
+    http:
+      paths:
+      - backend:
+          serviceName: efk-kibana-keycloak-proxy
+          servicePort: 3000
+        path: /
+---
