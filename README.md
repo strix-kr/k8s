@@ -705,3 +705,81 @@ Jenkins가 Github 훅을 받도록 연동합니다. 이후 [Multibranch Pipeline
 ## 12. 로깅 및 모니터링 인프라 구축
 
 ### EFK 스택 설치
+
+kubeapps에서 elastic-stack을 설치합니다. (elastic-search + fluentd + fluent-bit + kibana, 릴리즈명 efk)
+설치시 helm 설정에 ELASTICSEARCH_URL 변수를 아래와 같이 변경합니다.
+```
+kibana:
+  env:
+    ELASTICSEARCH_URL: http://efk-elasticsearch-client.default.svc.cluster.local:9200
+```
+
+OIDC 연동에는 keycloak master realm의 **kubernetes** 클라이언트를 그대로 이용합니다. kubernetes 클라이언트에 Redirect URL `https://logs.k8s.strix.kr/*`을 추가해줍니다. 이후 efk-kibana-keycloak-proxy 서비스를 구성하고 배포합니다. (ref. **17-efk-kibana-keycloak-proxy.yaml**)
+이제 https://logs.k8s.strix.kr 로 Kibana에 접속 할 수 있습니다.
+
+로그가 수집되기 까지 helm chart가 온전하지 않아 몇가지 수정이 필요합합니다.
+
+- efk-fluentd Deployment 환경 변수를 수정합니다.
+```
+$ kubectl patch deployment/efk-fluentd -n default --type json -p '[
+  {
+    "op": "replace",
+    "path": "/spec/template/spec/containers/0/env/0",
+    "value": {
+        "name": "OUTPUT_HOST",
+        "value": "efk-elasticsearch-client.default.svc.cluster.local"
+    }
+  }
+]'
+```
+
+- efk-fluentd Deployment 및 Service에 forward 포트를 열어줍니다.
+```
+$ kubectl patch deployment/efk-fluentd -n default --type json -p '[
+  {
+    "op": "add",
+    "path": "/spec/template/spec/containers/0/ports/2",
+    "value": {
+        "name": "forward",
+        "protocol": "TCP",
+        "containerPort": 24224
+    }
+  }
+]'
+
+$ kubectl patch service/efk-fluentd -n default --type json -p '[
+  {
+    "op": "add",
+    "path": "/spec/ports/1",
+    "value": {
+        "name": "forward",
+        "protocol": "TCP",
+        "port": 24224,
+        "targetPort": 24224
+    }
+  }
+]'
+```
+
+- fluent-bit 데몬이 로그를 전달 할 fluentd 호스트가 올바르지 않게 설정되어있습니다. fluent-bit-config ConfigMap을 직접 수정하고 fluent-bit Pod들을 수동을 삭제하여 재시작합니다.
+```
+...
+[OUTPUT]
+    Name          forward
+    Match         *
+    Host          efk-fluentd
+... 
+```
+
+- 오래된 로그를 제거할 CronJob의 설정이 올바르지 않습니다. efk-elastic-curator-config ConfigMap의 호스트를 올바르게 수정합니다.
+```
+...
+client:
+  hosts:
+    - efk-elasticsearch-client.default.svc.cluster.local
+  port: 9200
+...
+```
+
+
+이후 [Kibana](https://logs.k8s.strix.kr)에 접속하여 수집된 데이터를 바탕으로 색인 패턴을 생성합니다.
