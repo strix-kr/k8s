@@ -21,6 +21,9 @@ spec:
           - --client-id=kubernetes
           - --client-secret=1e117a20-3f0c-4648-acec-18a81f8f41fe
           - --enable-session-cookies=false
+          - --enable-token-header=false
+          - --enable-authorization-header=false
+          - --enable-authorization-cookies=false
           - --encryption-key=MsVRtDTD3TPXaI6bfAxfBvHUKUhjjXOn    # 32 bytes string
           - --upstream-url=http://efk-kibana.default.svc.cluster.local:443
           - --resources=uri=/*
