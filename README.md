@@ -783,3 +783,14 @@ client:
 
 
 이후 [Kibana](https://logs.k8s.strix.kr)에 접속하여 수집된 데이터를 바탕으로 색인 패턴을 생성합니다.
+
+
+## 13. 히스토리
+
+### 18.10.11
+```yaml
+# kops edit cluster
+kubeController:
+  nodeMonitorGracePeriod: 5m0s
+```
+노드 장애의 허용 시간을 40s -> 5m0s으로 증가시킴
