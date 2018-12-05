@@ -7,6 +7,7 @@ type: Opaque
 data:
   aws-route53-secret-access-key: Vm5LQXJwOC9oWXV3eENVVlBxbFg1MmJweWQ3SDJjRGdnVnZpTmJnTQo=
 ---
+# ref: https://cert-manager.readthedocs.io/en/latest/
 apiVersion: certmanager.k8s.io/v1alpha1
 kind: ClusterIssuer
 metadata:
@@ -31,4 +32,6 @@ spec:
           secretAccessKeySecretRef:
             name: cert-manager
             key: aws-route53-secret-access-key
+    # ACME HTTP-01
+    http01: {}
 ---
